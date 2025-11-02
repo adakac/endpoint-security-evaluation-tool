@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div id="status" class="alert alert-primary alert-dismissible fade show" role="alert" style="display: none;">
+    <p id="status-message" class="no-margin"></p>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+
+
+
+<h2>Start a new Upgrade</h2>
+<form id="upgrade_form" method="POST" action="{{ url_for('initiate_upgrade') }}">
+    <label for="version_select">Choose your current version:</label>
+    <br>
+    <select id="version_select" name="version_select">
+        {% for v in versions %}
+        <option value="{{ v }}">{{ v }}</option>
+        {% endfor %}
+    </select>
+    <p id="text"></p>
+    <input type="submit" value="Click to continue">
+</form>
+
+
+
+
+
+
+
+{% if upgrades %}
+<h2>Continue with Update</h2>
+<p>
+    <ul id="upgrades">
+    {% for u in upgrades %}
+        <li><a href="{{ url_for('upgrade', from_version=u.from_version, to_version=u.to_version) }}" target="_blank">{{ u.from_version }} to {{ u.to_version }}</a></li>
+    {% endfor %}
+    </ul>
+</p>
+{% endif %}
+
+<script>
+    $("#version_select").on("change", function() {
+        // Get all option elements from the dropdown menu and execute the val() function on each one,
+        // to get their value. Then execute get() to get a JavaScript array.
+        const versions = $("#version_select option").map(function() {
+            return $(this).val();
+        }).get()
+
+        const selected_version = $("#version_select").val();
+        const index = versions.indexOf(selected_version) + 1;
+        const next_version = versions[index];
+
+        if (next_version === undefined) {
+            $("#text").text("You are already on the newest version.");
+        } else {
+            $("#text").text(`You selected ${selected_version} and you want to upgrade to ${next_version}. Is this correct?`);
+        }
+    });
+
+    $("#upgrade_form").on("submit", function(e) {
+        e.preventDefault();
+        $.ajax({
+            url: "{{ url_for('initiate_upgrade') }}",
+            method: "POST",
+            data: $(this).serialize(),
+            success: function(response) {
+                $("#status-message").html(response.message);
+                $("#status").removeClass("alert-warning").addClass("alert-primary");
+                $("#status").show();
+                $("#upgrades").prepend(`<li><a href=${response.url} target="_blank">${response.url_text}</a></li>`);
+                
+            },
+            error: function(xhr) {
+                console.log(xhr);
+                message = xhr.responseJSON.message;
+                $("#status-message").html(message);
+                $("#status").removeClass("alert-primary").addClass("alert-warning");
+                $("#status").show();
+            }
+        });
+    });
+</script>
+{% endblock %}

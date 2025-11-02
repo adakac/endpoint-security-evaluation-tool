@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{# Create a list with categories and their respective friendly names. #}
+{% set categories = [
+        ("additions", "New Additions"),
+        ("major_version_changes", "Major Changes"),
+        ("minor_version_changes", "Minor Changes"),
+        ("other_version_changes", "Other Changes"),
+        ("patches", "Patches"),
+        ("revocations", "Revocations"),
+        ("deprecations", "Deprecations"),
+        ("deletions", "Deletions")
+] %}
+
+{# Calculate the total progress #}
+{% set items_count = changes | count %}
+{% set done_count = changes | selectattr("status", "equalto", "Done") | list | count %}
+{% set percentage = (done_count / items_count * 100) | round(2) %}
+
+{% block content %}
+<h1 id="status-total">Total: {{ percentage }}%</h1>
+
+{% for key, title in categories %}
+    {% set items = changes | selectattr("change_category", "equalto", key) | list %}
+    {% if items | count != 0 %}
+
+        {# Calculate the progress for the current category. #}
+        {% set items_count = items | count %}  
+        {% set done_count = items | selectattr("status", "equalto", "Done") | list | count %}
+        {% set percentage = (done_count / items_count * 100) | round(2) %}
+        
+        <h2>{{ title }} ({{ items_count }})</h2>
+        <h4 id="status-{{ key }}">Status: {{ percentage }}%</h4>
+
+        <table class="table table-striped table-bordered table-hover">
+            <thead>
+                <tr>
+                    <th style="width: 20%;">MITRE ID</th>
+                    <th style="width: 40%;">Name</th>
+                    <th style="width: 20%;">Status</th>
+                    <th style="width: 20%;">Icon</th>
+                </tr>
+            </thead>
+            <tbody style="vertical-align: middle;">
+            {% for i in items %}
+                <tr>
+                    <td><a href="{{ url_for('change', from_version=from_version, to_version=to_version, mitre_id=i.mitre_id) }}">{{ i.mitre_id }}</a></td>
+                    <td>{{ i.technique_name }}</td>
+                    <td>
+                        {# Use data attributes, so when updated, we know exactly which one is updates in JS. #}
+                        <select class="status-select" data-mitre="{{ i.mitre_id }}" data-category="{{ key }}">
+                            <option {% if i.status == 'Not Done' %} selected {% endif %}>Not Done</option>
+                            <option {% if i.status == 'In Progress' %} selected {% endif %}>In Progress</option>
+                            <option {% if i.status == 'Done' %} selected {% endif %}>Done</option>
+                        </select>
+                    </td>
+                    <td>
+                        {# Dots are invalid in IDs. #}
+                        {% set mitre_id = i.mitre_id | replace('.', '-') %}
+                        {% set icon_class = "bi-check" if i.status == 'Done' else "bi-hourglass-split" if i.status == 'In Progress' else "bi-ban" %}
+                        {% set color = "text-success" if i.status == 'Done' else "text-warning" if i.status == 'In Progress' else "text-danger" %}
+                        <i id="icon-{{ mitre_id }}" class="bi {{ icon_class }} {{ color }} fs-4"></i>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endfor %}
+
+<script>
+    // from_version -> to_version specifies the current upgrade. It's needed by the DB to make the necessary changes.
+    // tojson wraps everything around quotation marks.
+    const url = {{ url_for('change_status') | tojson }};
+    const from_version = {{ from_version | tojson }};
+    const to_version = {{ to_version | tojson }};
+    setEventListenerStatusSelect(url, from_version, to_version);
+</script>
+{% endblock %}
