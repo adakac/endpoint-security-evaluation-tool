@@ -21,3 +21,15 @@ JavaScript & CSS:
 - Bootstrap Icons v1.13.1
 - jQuery
 - diff
+
+## Installation
+
+```
+git clone https://github.com/adakac/endpoint-security-evaluation-tool.git
+pip install markdown sqlalchemy flask glom requests
+python ese.py
+```
+
+This automatically starts the web UI on port 8000. Then simply go to [http://localhost:8000](http://localhost:8000).
+
+A SQLite database is automatically created in ```./db```.
