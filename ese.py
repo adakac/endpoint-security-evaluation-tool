@@ -23,24 +23,19 @@ Base = declarative_base()
 engine = create_engine('sqlite:///db/mitre_changes.db', echo=False)
 db = Session(engine)
 
-# Define table for the MITRE changes in an upgrade.
-class MITREChange(Base):
-    __tablename__ = "mitre_changes"
-    change_id = Column(Integer, primary_key=True, autoincrement=True)
-    mitre_id = Column(Text)
-    technique_name = Column(Text)
-    change_category = Column(Text)
-    old_description = Column(Text)
-    new_description = Column(Text)
-    from_version = Column(Text)
-    to_version = Column(Text)
-    status = Column(Text, default="Not Done")
+# Setting global variables.
+# app.config can be used for settings or static values that can be accessed anywhere in the app.
+# If you don't use app.config for global variables, they are not available in routes.
+# NEW_VERSIONS stores a string array of newly available versions.
+# NEW_VERSIONS_AVAILABLE stores a bool value that indicates if a new MITRE version is available.
+# app.config["NEW_VERSIONS"] = []
+# app.config["NEW_VERSIONS_AVAILABLE"] = False
 
-# Create the table.
-Base.metadata.create_all(engine)
+NEW_VERSIONS = []
 
 # Disable caching so the page is always reloaded and shows the most recent data.
-# Else, if you change the status of something and go back, the change is not directly shown due to caching.
+# Else, if you change the status of a Change and go back to Overview, the change is not directly shown due to caching.
+# @app.after_request allows us to change the response before sending it to the user.
 @app.after_request
 def add_header(response):
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -49,10 +44,51 @@ def add_header(response):
     return response
 
 
+'''
+=====================================================================================
+| DATABASE SCHEME                                                                   |
+=====================================================================================
+'''
+# The following table stores each upgrade. For each change in an upgrade there is a comparison between the new and old description.
+# Changes can be tracked via a status.
+class MITREChange(Base):
+    __tablename__ = "mitre_changes"
+    change_id = Column(Integer, primary_key=True, autoincrement=True)
+    mitre_id = Column(Text)
+    url = Column(Text)
+    technique_name = Column(Text)
+    technique_tactic = Column(Text)
+    change_category = Column(Text)
+    old_description = Column(Text)
+    new_description = Column(Text)
+    from_version = Column(Text)
+    to_version = Column(Text)
+    status = Column(Text, default="Not Done")
+    client_criticality = Column(Integer)
+    client_criticality_sum = Column(Integer)
+    infra_criticality = Column(Integer)
+    infra_criticality_sum = Column(Integer)
+    service_criticality = Column(Integer)
+    service_criticality_sum = Column(Integer)
+
+
+
+# Table for all current MITRE versions to compare.
+class MITREVersions(Base):
+    __tablename__ = "mitre_versions"
+    major = Column(Integer, primary_key=True)
+    minor = Column(Integer, primary_key=True)
+    name = Column(Text)
+
+# Create the tables, if not already created.
+Base.metadata.create_all(engine)
+
+
 
 '''
 =====================================================================================
 | Custom Jinja filter for parsing Markdown text.                                    |
+| Converts a markdown string to HTML.                                               |
 =====================================================================================
 '''
 @app.template_filter('markdown')
@@ -64,44 +100,56 @@ def markdown_filter(text):
 '''
 =====================================================================================
 | This function gets all current MITRE versions available.                          |
+| It stores versions that are not on the local DB to the local DB.                  |
+| The function returns all new versions in a list.                                  |
 =====================================================================================
 '''
-def get_mitre_versions():
-    # Unfortunately, there is no API to get all MITRE versions, so we have to scrape the website.
-    # We could use the GitHub API to get all releases, but this does not show all versions
-    # (see https://github.com/mitre-attack/attack-stix-data/releases or https://github.com/mitre/cti/releases).
-    # The official python API from MITRE also does not support the listing of versions (see https://github.com/mitre-attack/mitreattack-python).
-    site = get("https://attack.mitre.org/resources/versions/").text
+def get_mitre_versions_api():
+    # To get the MITRE versions, we could either scrape the website which is not the most stable idea, but we can get all versions currently available. Also the website only lists the newest minor version per major version.
+    # Alternatively, we can use the Github API to get all releases. But here we can only get MITRE versions from up to 8.0. Versions below were not pushed to Github.
 
-    # Extract the versions with Regex.
-    pattern = r'v\d{1,2}\.\d(?!\.)'    
-    versions = set(re.findall(pattern, site))
+    # Github API allows us to fetch all releases up from v8.0. Versions below were not pushed to Github by MITRE.
+    req = get("https://api.github.com/repos/mitre/cti/releases")
 
-    # The MITRE website only lists the newest minor versions per major version, so we have to fill in the missing minor versions.
-    # We have to iterate over a copy of the version set(), because we are changing it and it would throw an error if we use the original.
-    for v in versions.copy():
+    # If error, exit the function.
+    # Happens mainly due to Githubs API rate limits.
+    if req.status_code >= 400:
+        return
+
+    # Iterate over all versions search for key "tag_name" which looks like this: 'ATT&CK-v18.0'.
+    # Then we extract the version like this: 'v18.0' and check if the version string matches the supplied regex.
+    versions = req.json()
+    versions = [t for v in versions if (t := str(v.get("tag_name").split('-')[1])) and re.search(r"^v\d{1,2}\.\d$", t)]
+
+    # Check if new version and write any versions that are not in the database to the database.
+    res = []
+    for v in versions:
+        # Split up into major and minor version and check DB.
         major, minor = map(int, v[1:].split('.'))
+        v_db = db.scalars(select(MITREVersions).where((MITREVersions.major == major) & (MITREVersions.minor == minor))).all()
 
-        # If the newest minor is 0, there are no other minor versions.
-        if minor == 0:
-            continue
+        # If new versions available, write to DB and set global variables.
+        if not v_db:
+            res.append(v)
+            db.add(MITREVersions(major = major, minor = minor, name = v))
+        
+    db.commit()
+    return res
 
-        # Include all other minor versions.
-        # E.g. if the newest minor version is 15.3, fill in 15.2, 15.1 and 15.0.
-        else:
-            for m in range(minor):
-                versions.add(f"v{major}.{m}")
+new_versions = get_mitre_versions_api()
 
-    # Return the versions as a list of strings and sorted.
-    # Sort by major version first.
-    # Else v10 comes right after v1 if you sort it by alphabet.
-    def version_key(v):
-        major_minor = v[1:].split('.')
-        return tuple(map(int, major_minor))
-    
-    return sorted(versions, key=version_key)
-
-
+'''
+=====================================================================================
+| Get all MITRE versions from the DB in a descending order.                         |
+=====================================================================================
+'''
+def get_mitre_versions_db():
+    return db.scalars(
+        select(MITREVersions).order_by(
+            MITREVersions.major.desc(),
+            MITREVersions.minor.desc()
+        )
+    ).all()
 
 '''
 =====================================================================================
@@ -111,8 +159,10 @@ def get_mitre_versions():
 '''
 @app.route("/")
 def homepage():
+    global NEW_VERSIONS
+
     # Get all ongoing upgrades from the database.
-    current_upgrades = db.execute(
+    current_upgrades = db.scalars(
         select(MITREChange.from_version, MITREChange.to_version) \
         .group_by(MITREChange.from_version, MITREChange.to_version)
     ).all()
@@ -121,9 +171,10 @@ def homepage():
     current_upgrades = [{"from_version": row[0], "to_version": row[1]} for row in current_upgrades]
 
     # Get all MITRE versions.
-    versions = get_mitre_versions()
+    versions = get_mitre_versions_db()
 
-    return render_template("homepage.html", versions=versions, upgrades=current_upgrades)
+    # TODO: Show notification when new MITRE version releases.
+    return render_template("homepage.html", versions=versions, upgrades=current_upgrades, new_versions="")
 
 
 
@@ -138,25 +189,40 @@ def homepage():
 '''
 @app.route("/upgrade/initiate", methods=['POST'])
 def initiate_upgrade():
-    # Get all versions.
-    versions = get_mitre_versions()
-
     # Get the user selected version.
-    from_version = request.form.get("version_select")
+    version_select = request.form.get("version_select")
     
-    # Get the next version.
-    index = versions.index(from_version) + 1
-    if index >= len(versions):
+    # Get the user selected version from DB.
+    from_version = db.scalar(select(MITREVersions).where(MITREVersions.name == version_select))
+
+    # Check if the next version is a minor version.
+    to_version = db.scalar(
+        select(MITREVersions) \
+        .where(
+            (MITREVersions.major == from_version.major) &
+            (MITREVersions.minor == (from_version.minor + 1)))
+    )
+
+    # If not, next version must be a major version.
+    if not to_version:
+        to_version = db.scalar(
+            select(MITREVersions) \
+            .where(
+                (MITREVersions.major == from_version.major + 1) &
+                (MITREVersions.minor == 0)
+            )
+        )
+
+    # If still nothing was found, the user must be on the newest version.    
+    if not to_version:
         return jsonify({"message": "You are already on the newest version"}),400
-    
-    to_version = versions[index]
-        
+
     # Get the current upgrade from the database.
     mitre_changes = db.scalars(
         select(MITREChange) \
         .where(
-            (MITREChange.from_version == from_version) &
-            (MITREChange.to_version == to_version)
+            (MITREChange.from_version == from_version.name) &
+            (MITREChange.to_version == to_version.name)
         )
     ).first()
     
@@ -168,8 +234,7 @@ def initiate_upgrade():
     else:
         # Works up from version 8.0.
         # Versions smaller than 8.0 have no JSON file for download.
-        result = get(f"https://attack.mitre.org/docs/changelogs/{from_version}-{to_version}/changelog.json")
-        print(f"https://attack.mitre.org/docs/changelogs/{from_version}-{to_version}/changelog.json")
+        result = get(f"https://attack.mitre.org/docs/changelogs/{from_version.name}-{to_version.name}/changelog.json")
 
         # If a JSON changelog file does not exist:
         if not result:
@@ -203,17 +268,17 @@ def initiate_upgrade():
                     old_description = old_description,
                     new_description = new_description,
                     change_category = category,
-                    from_version = from_version,
-                    to_version = to_version
+                    from_version = from_version.name,
+                    to_version = to_version.name
                 )
                 db.add(c)
-        
+
         db.commit()
-            
+    
         return jsonify({
-            "message": f"Successfully got the changelog from {from_version} to {to_version}. Click <a href=\"{url_for("upgrade", from_version=from_version, to_version=to_version)}\" target=\"_blank\">Link</a> to continue.",
-            "url": url_for("upgrade", from_version=from_version, to_version=to_version),
-            "url_text": f"{from_version} to {to_version}"
+            "message": f"Successfully got the changelog from {from_version.name} to {to_version.name}. Click <a href=\"{url_for("upgrade", from_version=from_version.name, to_version=to_version.name)}\" target=\"_blank\">Link</a> to continue.",
+            "url": url_for("upgrade", from_version=from_version.name, to_version=to_version.name),
+            "url_text": f"{from_version.name} to {to_version.name}"
         }), 200
 
 
@@ -300,5 +365,6 @@ def change_status():
 | Start the flask server in debug mode and on port 8000.                            |
 =====================================================================================
 '''
+# TODO: Remove Debugging mode when going productive.
 if __name__ == "__main__":
     app.run(debug=True, port=8000)

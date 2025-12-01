@@ -7,6 +7,17 @@
 </div>
 
 
+{% if new_versions %}
+    <p>
+        Since your last visit new MITRE version(s) released:
+        <ol>
+        {% for v in new_versions %}
+            <li>{{ v }}</li>
+        {% endfor %}
+        </ol>
+    </p>
+{% endif %}
+
 
 <h2>Start a new Upgrade</h2>
 <form id="upgrade_form" method="POST" action="{{ url_for('initiate_upgrade') }}">
@@ -14,11 +25,12 @@
     <br>
     <select id="version_select" name="version_select">
         {% for v in versions %}
-        <option value="{{ v }}">{{ v }}</option>
+        <option value="{{ v.name }}">{{ v.name }}</option>
         {% endfor %}
     </select>
     <p id="text"></p>
     <input type="submit" value="Click to continue">
+    <br><br><br>
 </form>
 
 
@@ -47,7 +59,9 @@
         }).get()
 
         const selected_version = $("#version_select").val();
-        const index = versions.indexOf(selected_version) + 1;
+        
+        // Minus 1, because of descending order.
+        const index = versions.indexOf(selected_version) - 1;
         const next_version = versions[index];
 
         if (next_version === undefined) {
