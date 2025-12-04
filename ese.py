@@ -5,7 +5,7 @@
 '''
 from requests import get
 import re, json
-from flask import Flask, render_template, request, abort, redirect, url_for, jsonify
+from flask import Flask, render_template, request, abort, redirect, url_for, jsonify, session
 from sqlalchemy import Column, Integer, Text, create_engine, Boolean, and_, select
 from sqlalchemy.orm import DeclarativeBase, Session, declarative_base
 from markdown import markdown
@@ -136,6 +136,7 @@ def get_mitre_versions_api():
     db.commit()
     return res
 
+# TODO: Use session['NEW_VERSIONS] = get_mitre_versions_api() for global access.
 new_versions = get_mitre_versions_api()
 
 '''
@@ -159,10 +160,8 @@ def get_mitre_versions_db():
 '''
 @app.route("/")
 def homepage():
-    global NEW_VERSIONS
-
     # Get all ongoing upgrades from the database.
-    current_upgrades = db.scalars(
+    current_upgrades = db.execute(
         select(MITREChange.from_version, MITREChange.to_version) \
         .group_by(MITREChange.from_version, MITREChange.to_version)
     ).all()
@@ -191,9 +190,11 @@ def homepage():
 def initiate_upgrade():
     # Get the user selected version.
     version_select = request.form.get("version_select")
+    print(version_select)
     
     # Get the user selected version from DB.
     from_version = db.scalar(select(MITREVersions).where(MITREVersions.name == version_select))
+    print(from_version.name)
 
     # Check if the next version is a minor version.
     to_version = db.scalar(
@@ -216,6 +217,8 @@ def initiate_upgrade():
     # If still nothing was found, the user must be on the newest version.    
     if not to_version:
         return jsonify({"message": "You are already on the newest version"}),400
+    
+    print(to_version.name)
 
     # Get the current upgrade from the database.
     mitre_changes = db.scalars(
