@@ -5,6 +5,8 @@ from requests import get
 from glom import glom
 import json, re
 
+
+
 '''
 =====================================================================================
 | This function parses the JSON changelog and fills all fields of the MITREChange   |
@@ -65,8 +67,12 @@ def parse_version_changes(from_version: str, to_version: str) -> list:
 
 
 
-# The function is given a version and determines which version is next.
-# It then returns the current and the next version as database objects.
+'''
+=====================================================================================
+| The function is given a version and determines which version is next.             |
+| It then returns the current and the next version as database objects.             |
+=====================================================================================
+'''
 def get_versions_db(current_version: str, db: Session) -> tuple[MITREVersion, MITREVersion]:
     
     # Get current version from DB.
@@ -96,25 +102,27 @@ def get_versions_db(current_version: str, db: Session) -> tuple[MITREVersion, MI
 
     # If there is no next version the variable 'next_version' is None.
     return current_version, next_version
-        
-
-# Get an existing update from the DB.
-def get_upgrade_db(from_version: str, to_version: str):
-    return ""
 
 
 
-
-
-
-# Checks if an upgrade is already in progress.
+'''
+=====================================================================================
+| Checks if an upgrade is already in progress.                                      |
+=====================================================================================
+'''
 def upgrade_exists(from_version: str, db: Session) -> bool:
     res = db.scalar(select(MITREChange).where(MITREChange.from_version == from_version))
     
     # Returns True if 'res' is not empty.
     return (res is not None)
 
-# Get all changes for a specific upgrade.
+
+
+'''
+=====================================================================================
+| Get all changes from a specific upgrade.                                          |
+=====================================================================================
+'''
 def get_changes(from_version: str, to_version: str, db: Session):
     return db.scalars(
         select(MITREChange).where(
@@ -137,10 +145,6 @@ def get_mitre_versions_db(db: Session):
             MITREVersion.minor.desc()
         )
     ).all()
-
-
-
-
 
 
 
@@ -201,12 +205,3 @@ def infra_sum(change: MITREChange) -> int:
 def service_sum(change: MITREChange) -> int:
     sum = change.confidentiality + change.integrity + change.availability + change.service_criticality
     return sum
-
-
-
-
-
-# Used for storing variables that need to be accessed globally.
-class AppState():
-    def __init__(self):
-        self.cache = {}
