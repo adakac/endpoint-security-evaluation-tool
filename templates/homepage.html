@@ -6,18 +6,19 @@
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 
-
 {% if new_versions %}
+<div class="alert alert-primary alert-dismissible fade show" role="alert">
     <p>
         Since your last visit new MITRE version(s) released:
-        <ol>
+        <ul>
         {% for v in new_versions %}
             <li>{{ v }}</li>
         {% endfor %}
-        </ol>
+        </ul>
     </p>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
 {% endif %}
-
 
 <h2>Start a new Upgrade</h2>
 <form id="upgrade_form" method="POST" action="{{ url_for('initiate_upgrade') }}">
@@ -33,7 +34,6 @@
     <br><br><br>
 </form>
 
-
 {# List all current upgrades #}
 {% if upgrades %}
 <h2>Continue with Update</h2>
@@ -46,48 +46,5 @@
 </p>
 {% endif %}
 
-<script>
-    $("#version_select").on("change", function() {
-        // Get all option elements from the dropdown menu and execute the val() function on each one,
-        // to get their value. Then execute get() to get a JavaScript array.
-        const versions = $("#version_select option").map(function() {
-            return $(this).val();
-        }).get()
-
-        const selected_version = $("#version_select").val();
-        
-        // Minus 1, because of descending order.
-        const index = versions.indexOf(selected_version) - 1;
-        const next_version = versions[index];
-
-        if (next_version === undefined) {
-            $("#text").text("You are already on the newest version.");
-        } else {
-            $("#text").text(`You selected ${selected_version} and you want to upgrade to ${next_version}. Is this correct?`);
-        }
-    });
-
-    $("#upgrade_form").on("submit", function(e) {
-        e.preventDefault();
-        $.ajax({
-            url: "{{ url_for('initiate_upgrade') }}",
-            method: "POST",
-            data: $(this).serialize(),
-            success: function(response) {
-                $("#status-message").html(response.message);
-                $("#status").removeClass("alert-warning").addClass("alert-primary");
-                $("#status").show();
-                $("#upgrades").prepend(`<li><a href=${response.url} target="_blank">${response.url_text}</a></li>`);
-                
-            },
-            error: function(xhr) {
-                console.log(xhr);
-                message = xhr.responseJSON.message;
-                $("#status-message").html(message);
-                $("#status").removeClass("alert-primary").addClass("alert-warning");
-                $("#status").show();
-            }
-        });
-    });
-</script>
+<script src="{{ url_for('static', filename='homepage.js') }}"></script>
 {% endblock %}

@@ -18,7 +18,35 @@
 {% set percentage = (done_count / items_count * 100) | round(2) %}
 
 {% block content %}
-<h1 id="status-total">Total: {{ percentage }}%</h1>
+<div id="data" style="overflow: auto;" data-from-version="{{ from_version }}" data-to-version="{{ to_version }}" data-url-status="{{ url_for('change_status') }}">
+    <div style="float: left;">
+        <h1 id="status-total">Progress: {{ percentage }}%</h1>
+        <h3>{{ from_version }} to {{ to_version }}</h3>
+        <br>
+        <label for="file">Upload Spreadsheet File:</label>
+        <br>
+        <input id="file" type="file">
+    </div>
+
+    <div style="float: right;">
+        <h1>Filter:</h1>
+        <div class="btn-group" role="group">
+            <input type="radio" class="btn-check" name="btnradio" id="btnradio1" checked>
+            <label class="btn btn-outline-primary" for="btnradio1">All</label>
+
+            <input type="radio" class="btn-check" name="btnradio" id="btnradio2">
+            <label class="btn btn-outline-primary" for="btnradio2">Done</label>
+
+            <input type="radio" class="btn-check" name="btnradio" id="btnradio3">
+            <label class="btn btn-outline-primary" for="btnradio3">In Progress</label>
+
+
+            <input type="radio" class="btn-check" name="btnradio" id="btnradio4">
+            <label class="btn btn-outline-primary" for="btnradio4">Not Done</label>
+        </div>
+    </div>
+</div>
+<br>
 
 {% for key, title in categories %}
     {% set items = changes | selectattr("change_category", "equalto", key) | list %}
@@ -30,25 +58,32 @@
         {% set percentage = (done_count / items_count * 100) | round(2) %}
         
         <h2>{{ title }} ({{ items_count }})</h2>
-        <h4 id="status-{{ key }}">Status: {{ percentage }}%</h4>
+        <h4 id="status-{{ key }}">Progress: {{ percentage }}%</h4>
 
         <table class="table table-striped table-bordered table-hover">
             <thead>
-                <tr>
+                <tr style="vertical-align: middle;">
                     <th style="width: 20%;">MITRE ID</th>
                     <th style="width: 40%;">Name</th>
-                    <th style="width: 20%;">Status</th>
-                    <th style="width: 20%;">Icon</th>
+                    <th style="width: 5%;">Client Criticality Sum</th>
+                    <th style="width: 5%;">Infrastructure Criticality Sum</th>
+                    <th style="width: 5%;">Service Criticality Sum</th>
+                    <th style="width: 15%;">Status</th>
+                    <th style="width: 10%;">Icon</th>
                 </tr>
             </thead>
             <tbody style="vertical-align: middle;">
             {% for i in items %}
                 <tr>
-                    <td><a href="{{ url_for('change', from_version=from_version, to_version=to_version, mitre_id=i.mitre_id) }}">{{ i.mitre_id }}</a></td>
+                    {# Replace "." with "-" in IDs or else it could cause problems with CSS selectors. #}
+                    <td><a id="mitre-link-{{ i.mitre_id | replace('.', '-') }}" class="mitre-link" href="{{ url_for('change', from_version=from_version, to_version=to_version, mitre_id=i.mitre_id) }}">{{ i.mitre_id }}</a></td>
                     <td>{{ i.technique_name }}</td>
+                    <td>{{ i.client_criticality_sum }}</td>
+                    <td>{{ i.infra_criticality_sum }}</td>
+                    <td>{{ i.service_criticality_sum }}</td>
                     <td>
                         {# Use data attributes, so when updated, we know exactly which one is updates in JS. #}
-                        <select class="status-select" data-mitre="{{ i.mitre_id }}" data-category="{{ key }}">
+                        <select class="status-select" data-mitre-id="{{ i.mitre_id }}" data-category="{{ key }}">
                             <option {% if i.status == 'Not Done' %} selected {% endif %}>Not Done</option>
                             <option {% if i.status == 'In Progress' %} selected {% endif %}>In Progress</option>
                             <option {% if i.status == 'Done' %} selected {% endif %}>Done</option>
@@ -69,11 +104,54 @@
 {% endfor %}
 
 <script>
-    // from_version -> to_version specifies the current upgrade. It's needed by the DB to make the necessary changes.
-    // tojson wraps everything around quotation marks.
-    const url = {{ url_for('change_status') | tojson }};
-    const from_version = {{ from_version | tojson }};
-    const to_version = {{ to_version | tojson }};
-    setEventListenerStatusSelect(url, from_version, to_version);
+    // Save scroll position, when clicking on a link.
+    $(".mitre-link").on("click", function() {
+        localStorage.setItem("scrollPosition", $(window).scrollTop());
+        localStorage.setItem("highlightID", $(this).attr("id"));
+    });
+
+    // Restore scroll position when going back.
+    $(window).on("load", function() {
+        // Reset scroll position.
+        const pos = localStorage.getItem("scrollPosition");
+        console.log(pos);
+        if (pos !== null) {
+            $(window).scrollTop(pos);
+            localStorage.setItem("scrollPosition", 0);
+        }
+
+        // Highlight the element when returning to the page.
+        const highlightID = localStorage.getItem("highlightID");
+        if (highlightID) {
+            const element = $("#" + highlightID).closest("tr");
+            element.addClass("highlight");
+            setTimeout(() => {
+                element.removeClass("highlight");
+            }, 5000);
+        }
+        localStorage.removeItem("highlightID");
+    });
+
+    // Filter
+    $('input[name="btnradio"]').on("click", function() {
+        const id = $(this).attr("id");
+        const label_text = $(`label[for=${id}]`).text();
+        
+        if (label_text == "All") {
+            $(".status-select").each(function() {
+                $(this).closest("tr").show();
+            });
+        } else {
+            $(".status-select").each(function() {
+                if ($(this).val() === label_text) {
+                    $(this).closest("tr").show();
+                } else {
+                    $(this).closest("tr").hide();
+                }
+            });
+        }
+    });
 </script>
+
+<script src="{{ url_for('static', filename='change.js') }}"></script>
 {% endblock %}

@@ -33,3 +33,12 @@ python ese.py
 This automatically starts the web UI on port 8000. Then simply go to [http://localhost:8000](http://localhost:8000).
 
 A SQLite database is automatically created in ```./db```.
+
+
+## Update
+
+Open SQLiteStudio and add the following columns:
+- other_changes (Text)
+- confidentiality (Boolean)
+- integrity (Boolean)
+- availability (Boolean)

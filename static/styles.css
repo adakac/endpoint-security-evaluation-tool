@@ -31,3 +31,34 @@
   text-decoration: line-through;
   color: #000000;
 }
+
+
+/* Highlights a table row. */
+.highlight td, .highlight a {
+    background-color: #88E788 !important;
+    color: #2A2A2A !important;
+    font-weight: bold;
+}
+
+
+/* Disabled button with a diagonal line through it. */
+.btn.disabled {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn.disabled::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -25%;
+    width: 150%;
+    height: 3px;
+    background-color: rgba(0, 0, 0, 0.8);
+    transform: rotate(-15deg);
+}
+
+
+input[type="number"] {
+    width: 100px;
+}
