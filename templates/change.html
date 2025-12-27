@@ -225,7 +225,7 @@
             </thead>
             <tbody>
             {% if other_changes.get('iterable_item_removed') %}
-                {% for key, value in other_changes.iterable_item.items() %}
+                {% for key, value in other_changes.iterable_item_removed.items() %}
                     <tr>
                         <td>{{ key }}</td>
                         <td>{{ value }}</td>
