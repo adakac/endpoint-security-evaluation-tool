@@ -36,7 +36,8 @@
 
 {# List all current upgrades #}
 {% if upgrades %}
-<h2>Continue with Update</h2>
+<h2>Current Upgrades</h2>
+{% endif %}
 <p>
     <ul id="upgrades">
     {% for u in upgrades %}
@@ -44,7 +45,6 @@
     {% endfor %}
     </ul>
 </p>
-{% endif %}
 
 <script src="{{ url_for('static', filename='homepage.js') }}"></script>
 {% endblock %}
