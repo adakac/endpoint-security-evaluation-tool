@@ -1,0 +1,13 @@
+div {
+    margin: 0;
+    padding: 0;
+}
+
+/* Rotate icon if clicked. */
+.toggle-icon {
+    transition: transform 0.3s;
+    display: inline-block;
+}
+[data-bs-toggle="collapse"][aria-expanded="true"] .toggle-icon {
+    transform: rotateZ(180deg);
+}
