@@ -19,11 +19,18 @@
 
     {# Custom CSS and JS files. #}
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="{{ url_for('static', filename='light_and_dark_mode.js') }}"></script>
+
+    {# Blocks for adding further scripts and styles to individual sites. #}
+    {% block scripts_top %}
+    {% endblock %}
+
+    {% block styles_top %}
+    {% endblock %}
 </head>
 
 <body>
-    <!-- TODO: Finish -->
+    <!-- TODO: Finish navbar -->
     <!-- https://getbootstrap.com/docs/5.3/components/navbar/ -->
     <nav class="navbar navbar-expand-lg bg-primary-subtle sticky-top">
         <div class="container-fluid">
@@ -42,5 +49,8 @@
 
     {# Bootstrap JS #}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+    
+    {% block scripts_bottom %}
+    {% endblock %}
 </body>
 </html>
