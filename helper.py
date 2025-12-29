@@ -51,7 +51,7 @@ def parse_version_changes(from_version: str, to_version: str) -> list:
 
             # If key "values_changed" doesn't exist (e.g. technique is a new addition), then use the "description" key.
             # Glom is great for deeply nested JSON.
-            old_description = glom(json_diff, "values_changed.root['description'].old_value", default="N/A")
+            old_description = glom(json_diff, "values_changed.root['description'].old_value", default="")
             new_description = glom(json_diff, "values_changed.root['description'].new_value", default=technique.get("description"))
 
             # Get the platforms of the technique in JSON format.

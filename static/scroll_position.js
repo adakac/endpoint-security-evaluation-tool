@@ -19,11 +19,14 @@ if (page === "changes.html") {
             return;
         }
 
-        // Scroll down to the element.
+        // Select the element and get the top offset, then subtract 200 due to the fixed navbar.
         let element = $(`#${highlightID}`);
-        element[0].scrollIntoView();
+        let offset = element.offset().top - 200;
 
-        // Highlight the entire row where the element is.for 5 seconds.
+        // Scroll to the position from above.
+        window.scrollTo({top: offset, behavior: "smooth"});
+
+        // Highlight the entire row where the element is for 5 seconds.
         let row = element.closest("tr");
         row.addClass("highlight");
         setTimeout(function() {

@@ -72,7 +72,7 @@ def homepage():
     # Get all MITRE versions.
     versions = get_mitre_versions_db(db)
 
-    return render_template("homepage.html", versions=versions, upgrades=current_upgrades, new_versions=app.config["new_versions"])
+    return render_template("homepage.html", title="Home", versions=versions, upgrades=current_upgrades, new_versions=app.config["new_versions"])
 
 
 
@@ -136,7 +136,7 @@ def upgrade(from_version, to_version):
     if not mitre_changes:
         abort(404)
 
-    return render_template("changes.html", changes=mitre_changes, from_version=from_version, to_version=to_version)
+    return render_template("changes.html", title=f"{from_version} to {to_version}", changes=mitre_changes, from_version=from_version, to_version=to_version)
 
 
 '''
