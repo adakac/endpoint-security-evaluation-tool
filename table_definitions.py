@@ -15,8 +15,9 @@ class MITREChange(Base):
     change_id = Column(Integer, primary_key=True, autoincrement=True)
     mitre_id = Column(Text)
     url = Column(Text)
-    technique_name = Column(Text)
-    technique_tactic = Column(Text)
+    category = Column(Text)
+    sub_category = Column(Text)
+    technique = Column(Text)
     change_category = Column(Text)
     old_description = Column(Text)
     new_description = Column(Text)
@@ -24,6 +25,7 @@ class MITREChange(Base):
     from_version = Column(Text)
     to_version = Column(Text)
     status = Column(Text, default="Not Done")
+    platforms = Column(Text)
     confidentiality = Column(Boolean, default=False)
     integrity = Column(Boolean, default=False)
     availability = Column(Boolean, default=False)
@@ -47,6 +49,7 @@ class MITREVersion(Base):
 def get_engine():
     return create_engine("sqlite:///db/mitre_changes.db", echo=False)
 
+# Returns a Session object that can be used to query the database.
 def get_db_connection():
     return Session(get_engine())
 
