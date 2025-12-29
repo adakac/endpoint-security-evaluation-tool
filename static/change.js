@@ -1,5 +1,3 @@
-/* Functions for 'change.html' and 'changes.html'. */
-
 /*
 =====================================================================================
 | Important variables taken from the element with id "data".                        |
@@ -9,6 +7,7 @@ const from_version = $("#data").data("from-version");
 const to_version = $("#data").data("to-version");
 const url_status = $("#data").data("url-status");
 const url_classification = $("#data").data("url-classification");
+const url_links = $("#data").data("url-links");
 
 /*
 =====================================================================================
@@ -65,93 +64,6 @@ function setEventListenerDiffButton() {
     });
 }
 
-/*
-=====================================================================================
-| The following function sets an event listener on a <select> tag that let's users  |
-| change the status of a change. The request is being sent via Ajax, so the site    |
-| can be dynamically updated. If the request was successfull, the progress is       |
-| updated (in percentage).                                                          |
-=====================================================================================
-*/
-function setEventListenerStatusSelect() {
-    $(".status-select").on("change", function() {
-        const status = $(this).val();
-        const category = $(this).data("category");
-        const mitre_id = $(this).data("mitre-id");
-
-        const data = {
-            from_version: from_version,
-            to_version: to_version,
-            mitre_id: mitre_id,
-            status: status
-        };
-
-        // https://api.jquery.com/jQuery.ajax/
-        $.ajax({
-            url: url_status,
-            method: "POST",
-            contentType: "application/json",
-            data: JSON.stringify(data),
-            success: function(response) {
-                // Dots are invalid in IDs.
-                mitre = mitre_id.replace(".", "-");
-                const icon = $(`#icon-${mitre}`);
-                icon.removeClass("bi-check bi-hourglass-split bi-ban text-success text-warning text-danger");
-                
-                // Change the icon.
-                if (status === "Done") {  
-                    icon.addClass("bi-check text-success");
-                }
-                else if (status == "In Progress") {
-                    icon.addClass("bi-hourglass-split text-warning");
-                }
-                else if (status == "Not Done") {
-                    icon.addClass("bi-ban text-danger");
-                }
-
-                if (category) {
-                    updatePercentage(category);
-                }
-            }
-        });
-    });
-}
-
-/*
-=====================================================================================
-| Dynamically update and calculate the current progress.                            |
-=====================================================================================
-*/
-function updatePercentage(category) {
-    // Dynamically get all select elements in total and count how many have selected "Done".
-    // Then calculate the new percentage and update the upper heading.
-    let total_done_count = 0;
-    let total_count = 0;
-    $(".status-select").each(function() {
-        if ($(this).val() == "Done") {
-            total_done_count++;
-        }
-        total_count++;
-    });
-    let percentage_total = (total_done_count / total_count * 100).toFixed(2);
-    $("#status-total").text(`Total: ${percentage_total}%`)
-
-    // Dynamically get all select elements per category and count the total and how many have selected "Done".
-    // Then calculate the new percentage and update the category heading.
-    let category_done_count = 0;
-    let category_count = 0;        
-    $(`.status-select[data-category="${category}"]`).each(function() {
-        if ($(this).val() === "Done") {
-            category_done_count++;
-        }
-        category_count++;
-    });
-    let percentage_category = (category_done_count / category_count * 100).toFixed(2);
-    $(`#status-${category}`).text(`Status: ${percentage_category}%`);
-}
-
-
-
 function setEventListenerClassification() {
     $(".classification").on("change", function() {
         const data = {
@@ -176,6 +88,48 @@ function setEventListenerClassification() {
     });
 }
 
+// Set prev link on a tag:
+function setPrevAndNextLink() {
+    // Get current filter of current upgrade.
+    let filter = localStorage.getItem(`filter-${from_version}-${to_version}`);
+    
+    // Get category (tactic) from data fields.
+    let category = $("#data").data("category");
+
+    // Construct dict for API call.
+    let data = {
+        from_version: from_version,
+        to_version: to_version,
+        category: category,
+        mitre_id: $("#mitre-id").text(),
+        filter: filter
+    }
+
+    // Get prev and next link from backend and insert them into the <a> elements.
+    $.ajax({
+        url: url_links,
+        method: "POST",
+        contentType: "application/json",
+        data: JSON.stringify(data),
+        dataType: "json",
+        success: function(response) {
+            // Set previous and next link if they exist. If they don't exist add the links to the 'disabled' class.
+            console.log(response);
+            if (response.prev_url) {
+                $("#prev").attr("href", response.prev_url);
+            } else {
+                $("#prev").addClass("disabled");
+            }
+
+            if (response.next_url) {
+                $("#next").attr("href", response.next_url);
+            } else {
+                $("#next").addClass("disabled");
+            }
+        }
+    });
+}
+
 setEventListenerDiffButton();
-setEventListenerStatusSelect();
 setEventListenerClassification();
+setPrevAndNextLink();
