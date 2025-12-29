@@ -8,6 +8,7 @@ from sqlalchemy import select
 from markdown import markdown
 from table_definitions import *
 from helper import *
+from pathlib import Path
 
 
 
@@ -17,10 +18,15 @@ from helper import *
 =====================================================================================
 '''
 app = Flask(__name__)
+
+# Create 'db' folder if it doesn't exist.
+Path("db").mkdir(exist_ok=True)
+
 db = get_db_connection()
 create_tables()
-app.config["new_versions"] = get_mitre_versions_api(db)
 
+# Get all versions and check if any new versions are released.
+app.config["new_versions"] = get_mitre_versions_api(db)
 
 # Disable caching so the page is always reloaded and shows the most recent data.
 # Else, if you change the status of a Change and go back to Overview, the change is not directly shown due to caching.

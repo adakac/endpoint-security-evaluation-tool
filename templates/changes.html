@@ -18,7 +18,7 @@
 {% set percentage = (done_count / items_count * 100) | round(2) %}
 
 {% block content %}
-<div id="data" style="overflow: auto;" data-from-version="{{ from_version }}" data-to-version="{{ to_version }}" data-url-status="{{ url_for('change_status') }}">
+<div id="data" style="overflow: auto;" data-page="changes.html" data-from-version="{{ from_version }}" data-to-version="{{ to_version }}" data-url-status="{{ url_for('change_status') }}">
     <div style="float: left;">
         <h1 id="status-total">Progress: {{ percentage }}%</h1>
         <h3>{{ from_version }} to {{ to_version }}</h3>
@@ -77,7 +77,7 @@
             {% for i in items %}
                 <tr>
                     {# Replace "." with "-" in IDs or else it could cause problems with CSS selectors. #}
-                    <td><a id="mitre-link-{{ i.mitre_id | replace('.', '-') }}" class="mitre-link" href="{{ url_for('change', from_version=from_version, to_version=to_version, category=i.category, mitre_id=i.mitre_id) }}">{{ i.mitre_id }}</a></td>
+                    <td><a id="mitre-link-{{ i.category }}-{{ i.mitre_id | replace('.', '-') }}" class="mitre-link" href="{{ url_for('change', from_version=from_version, to_version=to_version, category=i.category, mitre_id=i.mitre_id) }}">{{ i.mitre_id }}</a></td>
                     {# Transform the category string (e.g. 'privilege-escalation' -> 'Privilege Escalation') #}
                     <td>{{ i.category.replace('-', ' ').title() }}</td>
                     <td>{{ i.sub_category }}</td>

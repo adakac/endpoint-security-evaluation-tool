@@ -130,6 +130,15 @@ function setPrevAndNextLink() {
     });
 }
 
+function showCurrentFilter() {
+    let filter = localStorage.getItem(`filter-${from_version}-${to_version}`);
+    if (filter === null) {
+        filter = "All";
+    }
+    $("#filter").html(`<b>Filter</b>: ${filter}`);
+}
+
 setEventListenerDiffButton();
 setEventListenerClassification();
 setPrevAndNextLink();
+showCurrentFilter();

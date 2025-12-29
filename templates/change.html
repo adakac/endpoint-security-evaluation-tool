@@ -17,11 +17,19 @@
     "deletions": "Deletion"
 } %}
 
-<a href="{{ url_for('upgrade', from_version=change.from_version, to_version=change.to_version) }}">← Go back to overview</a>
+<div class="row px-3">
+    <div class="col-sm text-start">
+        <a href="{{ url_for('upgrade', from_version=change.from_version, to_version=change.to_version) }}">← Go back to overview</a>
+    </div>
+    <div class="col-sm text-end">
+        <p id="filter"></p>
+    </div>
+</div>
+
 
 {# Store important data about the page in the following <div> with data-* attributes. #}
 {# Several scripts need access to these informations. #}
-<div id="data" class="center" data-from-version="{{ change.from_version }}" data-to-version="{{ change.to_version }}" data-category="{{ change.category }}" data-url-status="{{ url_for('change_status') }}" data-url-classification="{{ url_for('change_classification') }}" data-url-links="{{ url_for('links') }}">
+<div id="data" class="center" data-page="change.html" data-from-version="{{ change.from_version }}" data-to-version="{{ change.to_version }}" data-category="{{ change.category }}" data-url-status="{{ url_for('change_status') }}" data-url-classification="{{ url_for('change_classification') }}" data-url-links="{{ url_for('links') }}" data-id="mitre-link-{{ change.category }}-{{ change.mitre_id | replace('.', '-') }}">
     <h1>{{ categories[change.change_category] }}</h1>
     <h2 class="center">
         <span id="mitre-id">{{ change.mitre_id }}</span> - 
@@ -272,4 +280,5 @@
 {% block scripts_bottom %}
 <script src="{{ url_for('static', filename='change.js') }}"></script>
 <script src="{{ url_for('static', filename='status.js') }}"></script>
+<script src="{{ url_for('static', filename='scroll_position.js')}}"></script>
 {% endblock %}
