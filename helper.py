@@ -18,6 +18,8 @@ def parse_version_changes(from_version: str, to_version: str) -> list:
     try:
         changelog = get(f"https://attack.mitre.org/docs/changelogs/{from_version}-{to_version}/changelog.json", timeout=10)
         changelog.raise_for_status()
+
+        # Get the whole Enterprise attack matrix.
         attack_data = get(f"https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack-{to_version[1:]}.json", timeout=10)
         attack_data.raise_for_status()
         attack_data = attack_data.json()
@@ -66,24 +68,32 @@ def parse_version_changes(from_version: str, to_version: str) -> list:
             categories = technique.get("kill_chain_phases")
 
             # Iterate over all references and extract the 'url' and 'external_id' (-> MITRE ID).
-            # Default value is None.
+            # Default value is an empty string.
             url = next((ref.get("url") for ref in technique.get("external_references") if ref.get("source_name") == "mitre-attack"), "")
-
             mitre_id = next((ref.get("external_id") for ref in technique.get("external_references")if ref.get("source_name") == "mitre-attack"), "")
 
             # If sub-technique, get the name of the parent technique (-> sub_category).
             if "." in mitre_id:
                 parent_id = mitre_id.split('.')[0]
-                parent_technique = next((object for object in attack_data.get("objects") if object.get("type") == "attack-pattern" and any(ref.get("external_id") == parent_id for ref in object.get("external_references", []))), {})
+                parent_technique = next(
+                    (
+                        # Iterate over all objects (e.g. mitigations, techniques, sub-techniques, ...)
+                        object for object in attack_data.get("objects")
+                        
+                        # Only select techniques and sub-techniques...
+                        if object.get("type") == "attack-pattern"
+                        
+                        # ...and the technique that has the parent_id.
+                        and any(ref.get("external_id") == parent_id for ref in object.get("external_references", []))
+                    ), {})
+                
                 sub_category = parent_technique.get("name", "")
                 technique_name = technique.get("name")
-                print(f"MITREID: {mitre_id} -- ParentID: {parent_id} -- Sub-Category: {sub_category} -- Technique: {technique_name}")
             
             # If not a sub-technique, then the technique name is the sub-category.
             else:
                 sub_category = technique.get("name")
                 technique_name = ""
-
 
             for c in categories:
                 # Get the name of the tactic/category.
