@@ -138,40 +138,52 @@ def upgrade(from_version, to_version):
 | Opens a change in an upgrade.                                                     |
 =====================================================================================
 '''
-@app.route("/upgrade/<from_version>-<to_version>/<mitre_id>")
-def change(from_version, to_version, mitre_id):
-    query = select(MITREChange).where((MITREChange.from_version == from_version) & (MITREChange.to_version == to_version) & (MITREChange.mitre_id == mitre_id))
+@app.route("/upgrade/<from_version>-<to_version>/<category>/<mitre_id>", methods=['GET', 'POST'])
+def change(from_version, to_version, category, mitre_id):
+    query = select(MITREChange).where((MITREChange.from_version == from_version) & (MITREChange.to_version == to_version) & (MITREChange.category == category) & (MITREChange.mitre_id == mitre_id))
     change = db.scalar(query)
-
-    # Get the previous and next change item of the current upgrade.
-    # Then get the URL of that item.
-    prev_change = db.scalar(
-        select(MITREChange) \
-        .where(
-            (MITREChange.from_version == from_version) &
-            (MITREChange.to_version == to_version) &
-            (MITREChange.change_id == change.change_id - 1)
-        )        
-    )
-    prev_change_url = url_for('change', from_version=prev_change.from_version, to_version=prev_change.to_version, mitre_id=prev_change.mitre_id) if prev_change else ""
-    
-    next_change = db.scalar(
-        select(MITREChange) \
-        .where(
-            (MITREChange.from_version == from_version) & 
-            (MITREChange.to_version == to_version) & 
-            (MITREChange.change_id == change.change_id + 1)
-        )
-    )
-    next_change_url = url_for('change', from_version=next_change.from_version, to_version=next_change.to_version, mitre_id=next_change.mitre_id) if next_change else ""
 
     try:
         other_changes = json.loads(change.other_changes)
     except:
         other_changes = ""
 
-    return render_template("change.html", change=change, other_changes=other_changes, prev_change=prev_change_url, next_change=next_change_url, title=mitre_id)
+    try:
+        platforms = json.loads(change.platforms)
+    except:
+        platforms = ""
 
+    return render_template("change.html", change=change, other_changes=other_changes, platforms=platforms, title=mitre_id)
+
+
+# Returns the URLs of the previous and next change.
+@app.route("/api/links", methods=['POST'])
+def links():
+    data = request.get_json()
+    from_version = data.get("from_version")
+    to_version = data.get("to_version")
+    category = data.get("category")
+    mitre_id = data.get("mitre_id")
+    filter = data.get("filter")
+
+    # Get the current change and determine the previous change based on the current change.
+    current_change = get_change(db, from_version, to_version, category, mitre_id)
+    prev_change = get_previous_change(db, current_change, filter)
+    next_change = get_next_change(db, current_change, filter)
+
+    # Determine the URL of the previous change according to alphabetical order.
+    prev_url = url_for('change', from_version=prev_change.from_version, to_version=prev_change.to_version, category=prev_change.category, mitre_id=prev_change.mitre_id) if prev_change else None
+    next_url = url_for('change', from_version=next_change.from_version, to_version=next_change.to_version, category=next_change.category, mitre_id=next_change.mitre_id) if next_change else None
+    
+    return jsonify({
+        "prev_url": prev_url,
+        "next_url": next_url
+    }),200
+
+
+
+
+    
 
 
 '''
@@ -184,12 +196,12 @@ def change_status():
     data = request.get_json()
     from_version = data.get("from_version")
     to_version = data.get("to_version")
+    category = data.get("category")
     mitre_id = data.get("mitre_id")
     status = data.get("status")
 
     # Get the object from database and change it.
-    query = select(MITREChange).where((MITREChange.from_version == from_version) & (MITREChange.to_version == to_version) & (MITREChange.mitre_id == mitre_id))
-    change = db.scalar(query)
+    change = get_change(db, from_version, to_version, category, mitre_id)
 
     if not change:
         abort(404)
