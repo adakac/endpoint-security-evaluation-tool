@@ -2,30 +2,43 @@
 This script saves and restores the scroll position when the user gets back to the overview page.
 */
 
-// Save scroll position, when clicking on a link.
-$(".mitre-link").on("click", function() {
-    localStorage.setItem("scrollPosition", $(window).scrollTop());
-    localStorage.setItem("highlightID", $(this).attr("id"));
-});
+// Get the page from where the JS file is called (e.g. change.html).
+const page = $("#data").data("page");
 
-// Restore scroll position when going back.
-$(window).on("load", function() {
-    // Reset scroll position.
-    const pos = localStorage.getItem("scrollPosition");
-    console.log(pos);
-    if (pos !== null) {
-        $(window).scrollTop(pos);
-        localStorage.setItem("scrollPosition", 0);
-    }
+if (page === "changes.html") {
+    // Save the ID of the element that was clicked on.
+    $(".mitre-link").on("click", function() {
+        localStorage.setItem("highlightID", $(this).attr("id"));
+    });
 
-    // Highlight the element when returning to the page.
-    const highlightID = localStorage.getItem("highlightID");
-    if (highlightID) {
-        const element = $("#" + highlightID).closest("tr");
-        element.addClass("highlight");
-        setTimeout(() => {
-            element.removeClass("highlight");
+    // Scroll down to the element when the site loads again.
+    $(window).on("load", function() {
+        let highlightID = localStorage.getItem("highlightID");
+
+        if (!highlightID) {
+            return;
+        }
+
+        // Scroll down to the element.
+        let element = $(`#${highlightID}`);
+        element[0].scrollIntoView();
+
+        // Highlight the entire row where the element is.for 5 seconds.
+        let row = element.closest("tr");
+        row.addClass("highlight");
+        setTimeout(function() {
+            row.removeClass("highlight");
         }, 5000);
-    }
-    localStorage.removeItem("highlightID");
-});
+
+        // Remove again, so it doesn't highlight when the page is simply reloaded.
+        localStorage.removeItem("highlightID");
+    });
+}
+
+if (page === "change.html") {
+    // Dynamically adjust the position when clicking on the 'previous' and 'next' links in the Overview pages.
+    $(window).on("load", function() {
+        let id = $("#data").data("id");
+        localStorage.setItem("highlightID", id);
+    });
+}
