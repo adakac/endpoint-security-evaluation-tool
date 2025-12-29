@@ -1,22 +1,10 @@
 {% extends 'base.html' %}
 
+{% block styles_top %}
+<link rel="stylesheet" href="{{ url_for('static', filename='change.css') }}">
+{% endblock %}
+
 {% block content %}
-<style>
-    div {
-        margin: 0;
-        padding: 0;
-    }
-
-    /* Rotate icon if clicked. */
-    .toggle-icon {
-        transition: transform 0.3s;
-        display: inline-block;
-    }
-    [data-bs-toggle="collapse"][aria-expanded="true"] .toggle-icon {
-        transform: rotateZ(180deg);
-    }
-</style>
-
 {# Create a dictionary with categories and their respective friendly names. #}
 {% set categories = {
     "additions": "New Addition",
@@ -33,16 +21,16 @@
 
 {# Store important data about the page in the following <div> with data-* attributes. #}
 {# Several scripts need access to these informations. #}
-<div id="data" class="center" data-from-version="{{ change.from_version }}" data-to-version="{{ change.to_version }}" data-url-status="{{ url_for('change_status') }}" data-url-classification="{{ url_for('change_classification') }}">
+<div id="data" class="center" data-from-version="{{ change.from_version }}" data-to-version="{{ change.to_version }}" data-category="{{ change.category }}" data-url-status="{{ url_for('change_status') }}" data-url-classification="{{ url_for('change_classification') }}" data-url-links="{{ url_for('links') }}">
     <h1>{{ categories[change.change_category] }}</h1>
     <h2 class="center">
         <span id="mitre-id">{{ change.mitre_id }}</span> - 
-        {{ change.technique_name }}
+        {{ change.technique or change.sub_category }}
     </h2>
     <br>
-        <a href="{{ prev_change }}" class="btn btn-secondary {% if not prev_change %}disabled{% endif %}">Previous</a>
+    <a id="prev" href="" class="btn btn-secondary">Previous</a>
     <button id="diff-button" class="btn btn-primary">Show Diff</button>
-    <a href="{{ next_change }}" class="btn btn-secondary {% if not next_change %}disabled{% endif %}">Next</a>
+    <a id="next" href="" class="btn btn-secondary">Next</a>
     <br><br>
     <table class="table" style="width: 500px; margin: 0 auto;">
         <tr>
@@ -101,7 +89,7 @@
             <div class="col">
                 <h3>Status:</h3>
                 <div>
-                    <select class="status-select" data-mitre-id="{{ change.mitre_id }}" style="vertical-align: middle; margin-right: 10px;">
+                    <select class="status-select" style="vertical-align: middle; margin-right: 10px;" data-mitre-id="{{ change.mitre_id }}" data-category="{{ change.category }}">
                         <option {% if change.status == 'Not Done' %} selected {% endif %}>Not Done</option>
                         <option {% if change.status == 'In Progress' %} selected {% endif %}>In Progress</option>
                         <option {% if change.status == 'Done' %} selected {% endif %}>Done</option>
@@ -117,6 +105,38 @@
 </div>
 
 <div class="container" style="white-space: wrap; padding-top: 75px;">
+    {# Technique details and platforms #}
+    <div class="row">
+        <div class="col-sm">
+            <h1>Technique</h1>
+            <table class="table">
+                <tr>
+                    <td><b>Category</b></td>
+                    <td>{{ change.category.replace('-', ' ').title() }}</td>
+                </tr>
+                <tr>
+                    <td><b>Sub-Category</b></td>
+                    <td>{{ change.sub_category }}</td>
+                </tr>
+                <tr>
+                    <td><b>Technique Name</b></td>
+                    <td>{{ change.technique or "-" }}</td>
+                </tr>
+            </table>
+        </div>
+        <div class="col-sm">
+            <h1>Platforms</h1>
+            <table class="table">
+                {% for p in platforms %}
+                <tr>
+                    <td>{{ p }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+
+    {# Descriptions #}
     <div class="row">
         {% if change.old_description != "N/A" %}
         <div class="col-sm">
@@ -247,6 +267,9 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
 
+{% block scripts_bottom %}
 <script src="{{ url_for('static', filename='change.js') }}"></script>
+<script src="{{ url_for('static', filename='status.js') }}"></script>
 {% endblock %}
