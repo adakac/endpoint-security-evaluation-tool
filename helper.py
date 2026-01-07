@@ -59,20 +59,33 @@ def parse_version_changes(from_version: str, to_version: str) -> list:
 
             # All other changes (except the description) will be stored as JSON in the database, since they are very dynamic.
             json_diff.get("values_changed", {}).pop("root['description']", None)
-            other_changes = json.dumps(json_diff)
+            
+            changelog_mitigations = technique.get("changelog_mitigations")
+            changelog_mitigations = {"changelog_mitigations": changelog_mitigations} if changelog_mitigations else {}
 
-            # Category = MITRE Tactic
+            changelog_detections = technique.get("changelog_datacomponent_detections")
+            changelog_detections = {"changelog_detections": changelog_detections} if changelog_detections else {}
+
+            changelog_detection_strategies = technique.get("changelog_detectionstrategy_detections")
+            changelog_detection_strategies = {"changelog_detection_strategies": changelog_detection_strategies} if changelog_detection_strategies else {}
+
+            # Put all dicts together and transform them to a JSON string.
+            other_changes = json_diff | changelog_mitigations | changelog_detections | changelog_detection_strategies
+            other_changes = json.dumps(other_changes)
+
             # A MITRE technique can belong to multiple tactics.
-            # Each combination of tactic and technique has it's own entry in the database.
-            # Depending on the tactic the scores can be different.
-            categories = technique.get("kill_chain_phases")
+            # Extract MITRE tactic names from the array in the changelog and sort alphabetically.
+            # Also transform the string from e.g. 'privilege-escalation' to 'Privilege Escalation'.
+            tactics = technique.get("kill_chain_phases")
+            tactics = sorted([t.get("phase_name").replace('-', ' ').title() for t in tactics])
+            tactics = ", ".join(tactics)
 
             # Iterate over all references and extract the 'url' and 'external_id' (-> MITRE ID).
             # Default value is an empty string.
             url = next((ref.get("url") for ref in technique.get("external_references") if ref.get("source_name") == "mitre-attack"), "")
             mitre_id = next((ref.get("external_id") for ref in technique.get("external_references")if ref.get("source_name") == "mitre-attack"), "")
 
-            # If sub-technique, get the name of the parent technique (-> sub_category).
+            # If sub-technique, get the name of the parent technique.
             if "." in mitre_id:
                 parent_id = mitre_id.split('.')[0]
                 parent_technique = next(
@@ -87,35 +100,41 @@ def parse_version_changes(from_version: str, to_version: str) -> list:
                         and any(ref.get("external_id") == parent_id for ref in object.get("external_references", []))
                     ), {})
                 
-                sub_category = parent_technique.get("name", "")
-                technique_name = technique.get("name")
+                technique_name = parent_technique.get("name", "")
+                sub_technique_name = technique.get("name")
+
+                # Sub-Techniques don't have any further sub-techniques.
+                sub_techniques = []
             
-            # If not a sub-technique, then the technique name is the sub-category.
+            # If not a sub-technique.
             else:
-                sub_category = technique.get("name")
-                technique_name = ""
+                technique_name = technique.get("name")
+                sub_technique_name = ""
+                # Check if a parent technique has any sub-techniques.
+                sub_techniques = [
+                    object for object in attack_data.get("objects", [])
+                    if object.get("type") == "attack-pattern"
+                    and any(f"{mitre_id}." in ref.get("external_id", "") for ref in object.get("external_references", []))
+                ]
 
-            for c in categories:
-                # Get the name of the tactic/category.
-                category = c.get("phase_name")
+            # Fill out all necessary fields of the MITREChange object.
+            change = MITREChange(
+                mitre_id = mitre_id,
+                url = url,
+                tactics = tactics,
+                technique = technique_name,
+                sub_technique = sub_technique_name,
+                nr_sub_techniques = len(sub_techniques),
+                old_description = old_description,
+                new_description = new_description,
+                other_changes = other_changes,
+                change_category = change_category,
+                from_version = from_version,
+                to_version = to_version,
+                platforms = platforms
+            )
 
-                # Fill out all necessary fields of the MITREChange object.
-                change = MITREChange(
-                    mitre_id = mitre_id,
-                    url = url,
-                    technique = technique_name,
-                    category = category,
-                    sub_category = sub_category,
-                    old_description = old_description,
-                    new_description = new_description,
-                    other_changes = other_changes,
-                    change_category = change_category,
-                    from_version = from_version,
-                    to_version = to_version,
-                    platforms = platforms
-                )
-
-                result.append(change)
+            result.append(change)
     
     return result
 
@@ -183,22 +202,21 @@ def get_changes(from_version: str, to_version: str, db: Session):
             (MITREChange.to_version == to_version)
         ) \
         .order_by(
-            asc(MITREChange.category),
-            asc(MITREChange.sub_category),
-            asc(MITREChange.technique)
+            asc(MITREChange.tactics),
+            asc(MITREChange.technique),
+            asc(MITREChange.sub_technique)
         )
     ).all()
 
 
 
 # get one particular change from db.
-def get_change(db: Session, from_version: str, to_version: str, category: str, mitre_id: str) -> MITREChange:
+def get_change(db: Session, from_version: str, to_version: str, mitre_id: str) -> MITREChange:
     return db.scalar(
         select(MITREChange) \
         .where(
             (MITREChange.from_version == from_version) &
             (MITREChange.to_version == to_version) &
-            (MITREChange.category == category) &
             (MITREChange.mitre_id == mitre_id)
         )
     )
@@ -212,12 +230,13 @@ def get_previous_change(db: Session, current_change: MITREChange, filter: str) -
         .where(
             (MITREChange.from_version == current_change.from_version) &
             (MITREChange.to_version == current_change.to_version) &
-            (MITREChange.change_category == current_change.change_category)
+            (MITREChange.change_category == current_change.change_category) &
+            (MITREChange.nr_sub_techniques == 0)
         ) \
         .order_by(
-            asc(MITREChange.category),
-            asc(MITREChange.sub_category),
-            asc(MITREChange.technique)
+            asc(MITREChange.tactics),
+            asc(MITREChange.technique),
+            asc(MITREChange.sub_technique)
         )
     
     # If filter is "Done", "In Progress" or "Not Done", only get the specific records from DB.
@@ -230,9 +249,9 @@ def get_previous_change(db: Session, current_change: MITREChange, filter: str) -
             (MITREChange.status == filter)
         ) \
         .order_by(
-            asc(MITREChange.category),
-            asc(MITREChange.sub_category),
-            asc(MITREChange.technique)
+            asc(MITREChange.tactics),
+            asc(MITREChange.technique),
+            asc(MITREChange.sub_technique)
         )
 
     # Determine index of current change and subtract 1 to get previous change.
@@ -240,7 +259,7 @@ def get_previous_change(db: Session, current_change: MITREChange, filter: str) -
     index = next(
         i for i, r in enumerate(results)
         if r.mitre_id == current_change.mitre_id
-        and r.category == current_change.category
+        and r.tactics == current_change.tactics
     )
 
     # If index is 0, there is no previous change, so return 'None'.
@@ -257,12 +276,13 @@ def get_next_change(db: Session, current_change: MITREChange, filter: str) -> MI
         .where(
             (MITREChange.from_version == current_change.from_version) &
             (MITREChange.to_version == current_change.to_version) &
-            (MITREChange.change_category == current_change.change_category)
+            (MITREChange.change_category == current_change.change_category) &
+            (MITREChange.nr_sub_techniques == 0)
         ) \
         .order_by(
-            asc(MITREChange.category),
-            asc(MITREChange.sub_category),
-            asc(MITREChange.technique)
+            asc(MITREChange.tactics),
+            asc(MITREChange.technique),
+            asc(MITREChange.sub_technique)
         )
     
     else:
@@ -274,9 +294,9 @@ def get_next_change(db: Session, current_change: MITREChange, filter: str) -> MI
             (MITREChange.status == filter)
         ) \
         .order_by(
-            asc(MITREChange.category),
-            asc(MITREChange.sub_category),
-            asc(MITREChange.technique)
+            asc(MITREChange.tactics),
+            asc(MITREChange.technique),
+            asc(MITREChange.sub_technique)
         )
     
     # Determine index of current change and add 1 to get next change.
@@ -284,7 +304,7 @@ def get_next_change(db: Session, current_change: MITREChange, filter: str) -> MI
     index = next(
         i for i, r in enumerate(results)
         if r.mitre_id == current_change.mitre_id
-        and r.category == current_change.category
+        and r.tactics == current_change.tactics
     )
     
     # If 'current_change' is the last one in the results, return None.
@@ -355,13 +375,22 @@ def get_mitre_versions_api(db: Session):
 =====================================================================================
 '''
 def client_sum(change: MITREChange) -> int:
+    if change.client_criticality == 0:
+        return 0
+
     sum = change.confidentiality + change.integrity + change.availability + change.client_criticality
     return sum
 
 def infra_sum(change: MITREChange) -> int:
+    if change.infra_criticality == 0:
+        return 0
+
     sum = change.confidentiality + change.integrity + change.availability + change.infra_criticality
     return sum
 
 def service_sum(change: MITREChange) -> int:
+    if change.service_criticality == 0:
+        return 0
+
     sum = change.confidentiality + change.integrity + change.availability + change.service_criticality
     return sum
