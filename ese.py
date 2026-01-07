@@ -276,9 +276,6 @@ def upload_file():
     file.seek(0)
     mimetype = from_buffer(file_bytes, mime=True)
 
-    print(file_ext)
-    print(mimetype)
-
     # Check the file. Only ods and xlsx is allowed.
     allowed_extensions = ["ods", "xlsx"]
     allowed_mimetypes = [
