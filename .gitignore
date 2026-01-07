@@ -1,5 +1,6 @@
 db/
 todos.md
+sheets/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
