@@ -9,6 +9,9 @@ from markdown import markdown
 from table_definitions import *
 from helper import *
 from pathlib import Path
+from os import path
+from magic import from_buffer
+import pyexcel
 
 
 
@@ -19,8 +22,9 @@ from pathlib import Path
 '''
 app = Flask(__name__)
 
-# Create 'db' folder if it doesn't exist.
+# Create 'db' folder if it doesn't exist and 'sheets' for uploaded XLSX/ODS files.
 Path("db").mkdir(exist_ok=True)
+Path("sheets").mkdir(exist_ok=True)
 
 db = get_db_connection()
 create_tables()
@@ -136,7 +140,10 @@ def upgrade(from_version, to_version):
     if not mitre_changes:
         abort(404)
 
-    return render_template("changes.html", title=f"{from_version} to {to_version}", changes=mitre_changes, from_version=from_version, to_version=to_version)
+    # Exclude all techniques that have sub-techniques
+    changes = [c for c in mitre_changes if c.nr_sub_techniques == 0]
+
+    return render_template("changes.html", title=f"{from_version} to {to_version}", changes=changes, from_version=from_version, to_version=to_version)
 
 
 '''
@@ -144,10 +151,9 @@ def upgrade(from_version, to_version):
 | Opens a change in an upgrade.                                                     |
 =====================================================================================
 '''
-@app.route("/upgrade/<from_version>-<to_version>/<category>/<mitre_id>", methods=['GET', 'POST'])
-def change(from_version, to_version, category, mitre_id):
-    query = select(MITREChange).where((MITREChange.from_version == from_version) & (MITREChange.to_version == to_version) & (MITREChange.category == category) & (MITREChange.mitre_id == mitre_id))
-    change = db.scalar(query)
+@app.route("/upgrade/<from_version>-<to_version>/<mitre_id>", methods=['GET', 'POST'])
+def change(from_version, to_version, mitre_id):
+    change = get_change(db, from_version, to_version, mitre_id)
 
     try:
         other_changes = json.loads(change.other_changes)
@@ -159,7 +165,7 @@ def change(from_version, to_version, category, mitre_id):
     except:
         platforms = ""
 
-    return render_template("change.html", change=change, other_changes=other_changes, platforms=platforms, title=mitre_id)
+    return render_template('change.html', change=change, other_changes=other_changes, platforms=platforms, title=mitre_id)
 
 
 # Returns the URLs of the previous and next change.
@@ -168,18 +174,17 @@ def links():
     data = request.get_json()
     from_version = data.get("from_version")
     to_version = data.get("to_version")
-    category = data.get("category")
     mitre_id = data.get("mitre_id")
     filter = data.get("filter")
 
     # Get the current change and determine the previous change based on the current change.
-    current_change = get_change(db, from_version, to_version, category, mitre_id)
+    current_change = get_change(db, from_version, to_version, mitre_id)
     prev_change = get_previous_change(db, current_change, filter)
     next_change = get_next_change(db, current_change, filter)
 
     # Determine the URL of the previous change according to alphabetical order.
-    prev_url = url_for('change', from_version=prev_change.from_version, to_version=prev_change.to_version, category=prev_change.category, mitre_id=prev_change.mitre_id) if prev_change else None
-    next_url = url_for('change', from_version=next_change.from_version, to_version=next_change.to_version, category=next_change.category, mitre_id=next_change.mitre_id) if next_change else None
+    prev_url = url_for('change', from_version=prev_change.from_version, to_version=prev_change.to_version, mitre_id=prev_change.mitre_id) if prev_change else None
+    next_url = url_for('change', from_version=next_change.from_version, to_version=next_change.to_version, mitre_id=next_change.mitre_id) if next_change else None
     
     return jsonify({
         "prev_url": prev_url,
@@ -197,12 +202,11 @@ def change_status():
     data = request.get_json()
     from_version = data.get("from_version")
     to_version = data.get("to_version")
-    category = data.get("category")
     mitre_id = data.get("mitre_id")
     status = data.get("status")
 
     # Get the object from database and change it.
-    change = get_change(db, from_version, to_version, category, mitre_id)
+    change = get_change(db, from_version, to_version, mitre_id)
 
     if not change:
         abort(404)
@@ -229,9 +233,8 @@ def change_classification():
     target = data.get("target")
 
     # Get the change from the DB.
-    query = select(MITREChange).where((MITREChange.from_version == from_version) & (MITREChange.to_version == to_version) & (MITREChange.mitre_id == mitre_id))
-    change = db.scalar(query)
-    
+    change = get_change(db, from_version, to_version, mitre_id)
+
     if not change:
         abort(404)
 
@@ -261,6 +264,87 @@ def change_classification():
         "service_criticality_sum": change.service_criticality_sum
     }),200
 
+
+
+@app.route("/api/upload-file", methods=['POST'])
+def upload_file():
+    file = request.files.get("file")
+    file_ext = file.filename.lower().split(".")[-1]
+
+    # Find out mimetype by reading the contents of the file.
+    file_bytes = file.read()
+    file.seek(0)
+    mimetype = from_buffer(file_bytes, mime=True)
+
+    print(file_ext)
+    print(mimetype)
+
+    # Check the file. Only ods and xlsx is allowed.
+    allowed_extensions = ["ods", "xlsx"]
+    allowed_mimetypes = [
+        # ODS
+        "application/vnd.oasis.opendocument.spreadsheet",
+        # XLSX
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        # XLSX files are basically ZIP files and are sometimes detected as application/zip.
+        "application/zip"
+    ]
+
+    if file_ext not in allowed_extensions or mimetype not in allowed_mimetypes:
+        return jsonify({"message": "Unsupported Filetype"}),400
+
+    # Get all data and construct a filename.
+    from_version = request.form.get("from_version")
+    to_version = request.form.get("to_version")
+    file_name = f"mitreattck_eval_{from_version}_{to_version}.{file_ext}"
+    file_path = path.join("sheets", file_name)
+    
+    # Save the file to disk.
+    file.save(file_path)
+
+
+    # Open excel with pyexcel
+    workbook = pyexcel.get_book(file_name=file_path, name_columns_by_row=0)
+    sheet = workbook["MITRE_ATT&CK"]
+
+    # First row are the headers, everything else is the data.
+    rows = sheet.to_array() # one array per row
+    headers = rows[0]
+    data = rows[1:]
+
+    # Convert array to dict (one dict per row).
+    sheet_dict = [dict(zip(headers, row)) for row in data]
+
+    # Read the excel and fill out the database.
+    for c in get_changes(from_version, to_version, db):
+        row = next(
+            (
+                r for r in sheet_dict
+                if r["MITREID"] == c.mitre_id
+            )
+        , {})
+
+        if not row:
+            continue
+
+        c.client_criticality = 0 if row["Client Criticality"] == "n.a." else row["Client Criticality"]
+        c.client_criticality_sum = 0 if row["Sum Criticality (Client)"] == "n.a." else row["Sum Criticality (Client)"]
+
+        c.infra_criticality = 0 if row["Infrastructure Criticality"] == "n.a." else row["Infrastructure Criticality"]
+        c.infra_criticality_sum = 0 if row["Sum Criticality (Infra)"] == "n.a." else row["Sum Criticality (Infra)"]
+
+        c.service_criticality = 0 if row["Service Criticality"] == "n.a." else row["Service Criticality"]
+        c.service_criticality_sum = 0 if row["Sum Criticality (Service)"] == "n.a." else row["Sum Criticality (Service)"]
+
+        c.confidentiality = True if row["Confidentiality"] == "x" else False
+        c.integrity = True if row["Integrity"] == "x" else False
+        c.availability = True if row["Availability"] == "x" else False
+
+    db.commit()
+
+    return jsonify({
+        "message": "Successfully loaded and read file. Database is updated. Refresh the site to see the changes."
+    }),200
 
 
 
