@@ -26,7 +26,7 @@ JavaScript & CSS:
 
 ```
 git clone https://github.com/adakac/endpoint-security-evaluation-tool.git
-pip install markdown sqlalchemy flask glom requests
+pip install markdown sqlalchemy flask glom requests pyexcel pyexcel-ods pyexcel-xlsx python-magic-bin
 python ese.py
 ```
 
