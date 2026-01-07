@@ -19,13 +19,21 @@
 
 {% block content %}
 <div id="data" style="overflow: auto;" data-page="changes.html" data-from-version="{{ from_version }}" data-to-version="{{ to_version }}" data-url-status="{{ url_for('change_status') }}">
-    <div style="float: left;">
+    <div style="float: left; width: 500px;">
         <h1 id="status-total">Progress: {{ percentage }}%</h1>
         <h3>{{ from_version }} to {{ to_version }}</h3>
         <br>
-        <label for="file">Upload Spreadsheet File (In Progress):</label>
+        <div>
+            <div id="message" class="alert alert-primary alert-dismissible fade show" role="alert" style="display: none; width: 100%;">
+                <p id="message-text"></p>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </div>
+        <label for="file-input">Upload Spreadsheet File (In Progress):</label>
         <br>
-        <input id="file" type="file">
+        <input id="file-input" type="file" accept=".xlsx,.ods">
+        <br><br>
+        <button id="upload-btn" class="btn btn-primary">Upload</button>
     </div>
 
     <div style="float: right;">
@@ -63,9 +71,9 @@
             <thead>
                 <tr style="vertical-align: middle;">
                     <th style="width: 10%;">MITRE ID</th>
-                    <th style="width: 20%;">Category</th>
-                    <th style="width: 20%;">Sub-Category</th>
-                    <th style="width: 30%;">Technique</th>
+                    <th style="width: 20%;">Tactic(s)</th>
+                    <th style="width: 20%;">Technique</th>
+                    <th style="width: 30%;">Sub-Technique</th>
                     <th style="width: 5%;">Client Criticality Sum</th>
                     <th style="width: 5%;">Infrastructure Criticality Sum</th>
                     <th style="width: 5%;">Service Criticality Sum</th>
@@ -77,18 +85,18 @@
             {% for i in items %}
                 <tr>
                     {# Replace "." with "-" in IDs or else it could cause problems with CSS selectors. #}
-                    <td><a id="mitre-link-{{ i.category }}-{{ i.mitre_id | replace('.', '-') }}" class="mitre-link" href="{{ url_for('change', from_version=from_version, to_version=to_version, category=i.category, mitre_id=i.mitre_id) }}">{{ i.mitre_id }}</a></td>
+                    <td><a id="mitre-link-{{ i.mitre_id | replace('.', '-') }}" class="mitre-link" href="{{ url_for('change', from_version=from_version, to_version=to_version, mitre_id=i.mitre_id) }}">{{ i.mitre_id }}</a></td>
                     {# Transform the category string (e.g. 'privilege-escalation' -> 'Privilege Escalation') #}
-                    <td>{{ i.category.replace('-', ' ').title() }}</td>
-                    <td>{{ i.sub_category }}</td>
-                    {# If 'i.technique' is empty, use '-'. #}
-                    <td>{{ i.technique or "−" }}</td>
+                    <td>{{ i.tactics }}</td>
+                    <td>{{ i.technique }}</td>
+                    {# If 'i.sub_technique' is empty, use '-'. #}
+                    <td>{{ i.sub_technique or "−" }}</td>
                     <td>{{ i.client_criticality_sum }}</td>
                     <td>{{ i.infra_criticality_sum }}</td>
                     <td>{{ i.service_criticality_sum }}</td>
                     <td>
                         {# Use data attributes, so when updated, we know exactly which one is updates in JS. #}
-                        <select class="status-select" data-mitre-id="{{ i.mitre_id }}" data-category="{{ i.category }}" data-change-category="{{ key }}">
+                        <select class="status-select" data-mitre-id="{{ i.mitre_id }}" data-change-category="{{ key }}">
                             <option {% if i.status == 'Not Done' %} selected {% endif %}>Not Done</option>
                             <option {% if i.status == 'In Progress' %} selected {% endif %}>In Progress</option>
                             <option {% if i.status == 'Done' %} selected {% endif %}>Done</option>
@@ -113,4 +121,48 @@
 <script src="{{ url_for('static', filename='scroll_position.js') }}"></script>
 <script src="{{ url_for('static', filename='filter.js') }}"></script>
 <script src="{{ url_for('static', filename='status.js') }}"></script>
+
+<script>
+    // Handle file upload
+    const upload_btn = $("#upload-btn");
+    let file_input = $("#file-input");
+
+    upload_btn.on("click", function() {
+        let file = file_input.prop("files")[0];
+        
+        if (!file) {
+            alert("Select a file first");
+            return;
+        }
+        
+        const form_data = new FormData();
+        const from_version = $("#data").data("from-version");
+        const to_version = $("#data").data("to-version");
+        form_data.append("file", file);
+        form_data.append("from_version", from_version);
+        form_data.append("to_version", to_version);
+
+        $.ajax({
+            url: "/api/upload-file",
+            type: "POST",
+            data: form_data,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                $("#message").removeClass("alert-danger");
+                $("#message").addClass("alert-primary");
+                $("#message").toggle();
+                $("#message-text").text(response.message);
+            },
+            error: function(xhr, status, error) {
+                message = xhr.responseJSON.message;
+                $("#message").removeClass("alert-primary");
+                $("#message").addClass("alert-danger");
+                $("#message").toggle();
+                $("#message-text").text(message);
+            }
+        })
+    });
+
+</script>
 {% endblock %}
