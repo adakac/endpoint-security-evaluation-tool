@@ -9,22 +9,18 @@
 function setEventListenerStatusSelect() {
     $(".status-select").on("change", function() {
         const status = $(this).val();
-        const category = $(this).data("category");
         const mitre_id = $(this).data("mitre-id");
         const url_status = $("#data").data("url-status");
         const from_version = $("#data").data("from-version");
         const to_version = $("#data").data("to-version");
         const change_category = $(this).data("change-category");
-        console.log(change_category);
 
         const data = {
             from_version: from_version,
             to_version: to_version,
-            category: category,
             mitre_id: mitre_id,
             status: status
         };
-        console.log(data);
 
         // https://api.jquery.com/jQuery.ajax/
         $.ajax({
@@ -49,9 +45,7 @@ function setEventListenerStatusSelect() {
                     icon.addClass("bi-ban text-danger");
                 }
 
-                if (change_category) {
-                    updatePercentage(change_category);
-                }
+                updatePercentage(change_category);
             }
         });
     });
@@ -62,7 +56,7 @@ function setEventListenerStatusSelect() {
 | Dynamically update and calculate the current progress.                            |
 =====================================================================================
 */
-function updatePercentage(category) {
+function updatePercentage(change_category) {
     // Dynamically get all select elements in total and count how many have selected "Done".
     // Then calculate the new percentage and update the upper heading.
     let total_done_count = 0;
@@ -80,14 +74,14 @@ function updatePercentage(category) {
     // Then calculate the new percentage and update the category heading.
     let change_category_done_count = 0;
     let change_category_count = 0;        
-    $(`.status-select[data-change-category="${category}"]`).each(function() {
+    $(`.status-select[data-change-category="${change_category}"]`).each(function() {
         if ($(this).val() === "Done") {
             change_category_done_count++;
         }
         change_category_count++;
     });
     let percentage_category = (change_category_done_count / change_category_count * 100).toFixed(2);
-    $(`#status-${category}`).text(`Status: ${percentage_category}%`);
+    $(`#status-${change_category}`).text(`Status: ${percentage_category}%`);
 }
 
 setEventListenerStatusSelect();

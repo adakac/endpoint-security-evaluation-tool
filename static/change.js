@@ -92,15 +92,11 @@ function setEventListenerClassification() {
 function setPrevAndNextLink() {
     // Get current filter of current upgrade.
     let filter = localStorage.getItem(`filter-${from_version}-${to_version}`);
-    
-    // Get category (tactic) from data fields.
-    let category = $("#data").data("category");
 
     // Construct dict for API call.
     let data = {
         from_version: from_version,
         to_version: to_version,
-        category: category,
         mitre_id: $("#mitre-id").text(),
         filter: filter
     }
