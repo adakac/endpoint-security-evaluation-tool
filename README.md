@@ -15,6 +15,10 @@ Python:
 - flask
 - glom
 - requests
+- pyexcel
+- pyexcel-ods
+- pyexcel-xlsx
+- python-magic-bin
 
 JavaScript & CSS:
 - Bootstrap 5.3.8
