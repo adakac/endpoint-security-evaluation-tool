@@ -84,4 +84,6 @@ function updatePercentage(change_category) {
     $(`#status-${change_category}`).text(`Status: ${percentage_category}%`);
 }
 
+
+
 setEventListenerStatusSelect();
