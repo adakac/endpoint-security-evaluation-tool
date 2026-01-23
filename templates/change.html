@@ -1,7 +1,10 @@
 {% extends 'base.html' %}
 
-{% block styles_top %}
-<link rel="stylesheet" href="{{ url_for('static', filename='change.css') }}">
+{% block navbar_elements %}
+<div>
+    <a id="prev" href="" class="btn btn-secondary"><b>Previous</b></a>
+    <a id="next" href="" class="btn btn-secondary"><b>Next</b></a>
+</div>
 {% endblock %}
 
 {% block content %}
@@ -22,93 +25,315 @@
         <a href="{{ url_for('upgrade', from_version=change.from_version, to_version=change.to_version) }}">← Go back to overview</a>
     </div>
     <div class="col-sm text-end">
-        <p id="filter"></p>
+        <p style="margin: 0;" id="filter"></p>
+        {% if mitre_link_old %}
+        <a href="{{mitre_link_old}}" target="_blank">{{ change.from_version }} Link</a>
+        <br>
+        {% endif %}
+        <a style="margin-left: 20px;" href="{{mitre_link_new}}" target="_blank">{{ change.to_version }} Link</a>
     </div>
 </div>
 
 
 {# Store important data about the page in the following <div> with data-* attributes. #}
 {# Several scripts need access to these informations. #}
-<div id="data" class="center" data-page="change.html" data-from-version="{{ change.from_version }}" data-to-version="{{ change.to_version }}" data-url-status="{{ url_for('change_status') }}" data-url-classification="{{ url_for('change_classification') }}" data-url-links="{{ url_for('links') }}" data-id="mitre-link-{{ change.mitre_id | replace('.', '-') }}">
+<div id="data" class="center"
+        data-page="change.html"
+        data-from-version="{{ change.from_version }}"
+        data-to-version="{{ change.to_version }}"
+        data-url-status="{{ url_for('change_status') }}"
+        data-url-classification="{{ url_for('change_classification') }}"
+        data-url-links="{{ url_for('links') }}"
+        data-url-evaluation-status="{{ url_for('change_evaluation_status') }}"
+        data-url-reasoning-and-measures="{{ url_for('change_reasoning_and_measures') }}"
+        data-id="mitre-link-{{ change.mitre_id | replace('.', '-') }}"
+    >
+
+    {# Header. Contains important information (MITRE-ID, Technique, Sub-Technique), buttons for next and previous items and a dropdown to change the status #}
     <h1>{{ categories[change.change_category] }}</h1>
     <h2 class="center">
         <span id="mitre-id">{{ change.mitre_id }}</span>
         <br>
         <b>{{ change.technique }}</b>{% if change.sub_technique %}: {{ change.sub_technique }}{% endif %}
     </h2>
-    <br>
-    <a id="prev" href="" class="btn btn-secondary">Previous</a>
-    <button id="diff-button" class="btn btn-primary">Show Diff</button>
-    <a id="next" href="" class="btn btn-secondary">Next</a>
     <br><br>
-    <table class="table table-bordered" style="width: 500px; margin: 0 auto;">
-        <tr>
-            <th>Client Criticality Sum</th>
-            <th>Infrastructure Criticality Sum</th>
-            <th>Service Criticality Sum</th>
-        </tr>
-        <tr>
-            <td id="client-criticality-sum">{{ change.client_criticality_sum }}</td>
-            <td id="infra-criticality-sum">{{ change.infra_criticality_sum }}</td>
-            <td id="service-criticality-sum">{{ change.service_criticality_sum }}</td>
-        </tr>
-    </table>
+    <div class="col">
+        <h3>Change Status</h3>
+        <div>
+            <select class="status-select" style="vertical-align: middle; margin-right: 10px;" data-mitre-id="{{ change.mitre_id }}">
+                <option {% if change.status == 'Not Done' %} selected {% endif %}>Not Done</option>
+                <option {% if change.status == 'In Progress' %} selected {% endif %}>In Progress</option>
+                <option {% if change.status == 'Done' %} selected {% endif %}>Done</option>
+            </select>
+            {% set mitre_id = change.mitre_id | replace('.', '-') %}
+            {% set icon_class = "bi-check" if change.status == 'Done' else "bi-hourglass-split" if change.status == 'In Progress' else "bi-ban" %}
+            {% set color = "text-success" if change.status == 'Done' else "text-warning" if change.status == 'In Progress' else "text-danger" %}
+            <i id="icon-{{ mitre_id }}" class="bi {{ icon_class }} {{ color }} fs-3" style="vertical-align: middle;"></i>
+        </div>
+    </div>
+    <br><br>
 
+    {# Table with all Criticality Sums (Client, Infrastructure, Service) #}
+    <div class="d-flex align-items-start justify-content-center">
+        <table class="table table-bordered mb-0" style="width: 500px">
+            <tr>
+                <th>Client Criticality Sum</th>
+                <th>Infrastructure Criticality Sum</th>
+                <th>Service Criticality Sum</th>
+            </tr>
+            <tr>
+                <td id="client-criticality-sum">{{ change.client_criticality_sum }}</td>
+                <td id="infra-criticality-sum">{{ change.infra_criticality_sum }}</td>
+                <td id="service-criticality-sum">{{ change.service_criticality_sum }}</td>
+            </tr>
+        </table>
+        <i class="bi bi-info-circle ms-2"
+            data-bs-toggle="tooltip"
+            data-bs-html="true"
+            data-bs-placement="right"
+            title="
+                <p><b>Rating</b></p>
+                <p>Every technique is relevant and depicts a weakness. This rating defines the criticality of a weakness to the specific company. A rating of 5-6 requires immediate action, on 3-4 remidiation is urgent, on a rating of 1-2 action is required.</p>     
+        "></i>
+    </div>
     <br><br>
-    <div class="container" style="width: 800px;">
+
+    {# Assessment of the technique. E.g. criticality scores, reasonings and measures, ... #}
+    <div class="container">
+        <h1 id="toggle-assessment" data-bs-toggle="collapse" data-bs-target="#assessment" style="cursor: pointer; text-align: left;" aria-expanded="false">
+            Assessment
+            <i class="bi bi-chevron-down toggle-icon fs-3"></i>
+        </h1>
+    </div>
+
+    <div id="assessment" class="container collapse">
         <div class="row">
             <div class="col">
-                <h3>Classification:</h3>
+                <h3>Classification</h3>
                 <div class="container" style="width: 500px; padding: 10px; text-align: left;">
                     <div class="row p-2">
                         <div class="col">
-                            <label for="client-criticality">Client Criticality</label>
+                            <label for="client-criticality">
+                                Client Criticality
+                                {# Tooltip on hover. See https://getbootstrap.com/docs/5.0/components/tooltips/  #}
+                                <i class="bi bi-info-circle"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-html="true"
+                                    data-bs-placement="right"
+                                    title="
+                                        <p><b>Client Criticality</b></p>
+                                        <p>Subjective Expert Evaluation & Risk Readiness on Client Devices - Every element stands for itself. F.e.: Hiding C2 traffic has a lower criticality than the actual placement of said C2 client.</p>
+                                        <ol>
+                                            <li>High loss on/risk of/risk on exploitation</li>
+                                            <li>Losses on/risk on/risk of exploitation</li>
+                                            <li>Low risk of/risk on/loss on exploitation</li>
+                                        </ol>
+                                    "></i>
+                            </label>
                             <br>
                             <input id="client-criticality" class="classification" type="number" min="0" max="3" value="{{ change.client_criticality }}">
                         </div>
                         <div class="col d-flex align-items-center">
                             <input id="confidentiality" type="checkbox" class="me-2 classification" {% if change.confidentiality %}checked{% endif %}>
-                            <label for="confidentiality">Confidentiality</label>
+                            <label for="confidentiality">
+                                Confidentiality
+                                <i class="bi bi-info-circle"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-html="true"
+                                    title="
+                                        <p><b>Confidentiality/Vertraulichkeit</b></p>
+                                        <p>Data may only be used by authorized Personel. Relates to saved data and data in transit. Also includes hiding program- and system-configurations from unauthorized users.</p>
+                                    "
+                                ></i>
+                            </label>
                         </div>
                     </div>
                     <div class="row p-2">
                         <div class="col">
-                            <label for="infra-criticality">Infrastructure Criticality</label>
+                            <label for="infra-criticality">
+                                Infrastructure Criticality
+                                <i class="bi bi-info-circle"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-html="true"
+                                    data-bs-placement="right"
+                                    title="
+                                        <p><b>Infrastructure Criticality</b></p>
+                                        <p>Subjective Expert Evaluation & Risk Readiness on Network and Server Devices (f.e. ESXi) - Every element stands for itself. F.e.: Hiding C2 traffic has a lower criticality than the actual placement of said C2 client.</p>
+                                        <ol>
+                                            <li>High loss on/risk of/risk on exploitation</li>
+                                            <li>Losses on/risk on/risk of exploitation</li>
+                                            <li>Low risk of/risk on/loss on exploitation</li>
+                                        </ol>
+                                    "
+                                ></i>
+                            </label>
                             <br>
                             <input id="infra-criticality" class="classification" type="number" min="0" max="3" value="{{ change.infra_criticality }}">
                         </div>
                         <div class="col d-flex align-items-center">
                             <input id="integrity" type="checkbox" class="me-2 classification" {% if change.integrity %}checked{% endif %}>
-                            <label for="integrity">Integrity</label>
+                            <label for="integrity">
+                                Integrity
+                                <i class="bi bi-info-circle"
+                                data-bs-toggle="tooltip"
+                                data-bs-html="true"
+                                data-bs-placement="right"
+                                title="
+                                    <p><b>Integrity/Integrität</b></p>
+                                    <p>Tracability of changes on data. Changes need to be comprehensible and complete. This includes measures like versioning and recovery.</p>
+                                "
+                            ></i>
+                            </label>
                         </div>
                     </div>
                     <div class="row p-2">
                         <div class="col">
-                            <label for="service-criticality">Service Criticality</label>
+                            <label for="service-criticality">
+                                Service Criticality
+                                <i class="bi bi-info-circle"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-html="true"
+                                    data-bs-placement="right"
+                                    title="
+                                        <p><b>Service Criticality</b></p>
+                                        <p>Subjective Expert Evaluation & Risk Readiness on &quot;as a Service&quot; Systems like IaaS or MS365 - Every element stands for itself. F.e.: Hiding C2 traffic has a lower criticality than the actual placement of said C2 client.</p>
+                                        <ol>
+                                            <li>High loss on/risk of/risk on exploitation</li>
+                                            <li>Losses on/risk on/risk of exploitation</li>
+                                            <li>Low risk of/risk on/loss on exploitation</li>
+                                        </ol>
+                                    "
+                                ></i>
+                            </label>
                             <br>
                             <input id="service-criticality" class="classification" type="number" min="0" max="3" value="{{ change.service_criticality }}">
                         </div>
                         <div class="col d-flex align-items-center">
                             <input id="availability" type="checkbox" class="me-2 classification" {% if change.availability %}checked{% endif %}>
-                            <label for="availability">Availability</label>
+                            <label for="availability">
+                                Availability
+                                <i class="bi bi-info-circle"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-html="true"
+                                    data-bs-placement="right"
+                                    title="
+                                        <p><b>Availability/Verfügbarkeit</b></p>
+                                        <p>Data needs to be accessible and available if needed. Functionality and authenticity of data, services and programs has to be ensured.</p>
+                                    "
+                                ></i>
+                            </label>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col">
-                <h3>Status:</h3>
+        </div>
+
+        <br><br>
+        <h3>Measures</h3>
+        <div class="row">
+            <div class="col text-start">
+
+                {# Client Reasoning #}
                 <div>
-                    <select class="status-select" style="vertical-align: middle; margin-right: 10px;" data-mitre-id="{{ change.mitre_id }}">
-                        <option {% if change.status == 'Not Done' %} selected {% endif %}>Not Done</option>
-                        <option {% if change.status == 'In Progress' %} selected {% endif %}>In Progress</option>
-                        <option {% if change.status == 'Done' %} selected {% endif %}>Done</option>
-                    </select>
-                    {% set mitre_id = change.mitre_id | replace('.', '-') %}
-                    {% set icon_class = "bi-check" if change.status == 'Done' else "bi-hourglass-split" if change.status == 'In Progress' else "bi-ban" %}
-                    {% set color = "text-success" if change.status == 'Done' else "text-warning" if change.status == 'In Progress' else "text-danger" %}
-                    <i id="icon-{{ mitre_id }}" class="bi {{ icon_class }} {{ color }} fs-3" style="vertical-align: middle;"></i>
+                    <label for="client-reasoning"><b>Client Reasoning</b></label>
+                    <textarea name="client-reasoning" rows="4" class="form-control">{{ change.client_reasoning or "" }}</textarea>
+                    <br>
+                    <button type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
+                    <span class="message"></span>
                 </div>
+                <br><br>
+
+                {# Client Measures #}
+                <div>
+                    <label for="client-measures"><b>Client Measures</b></label>
+                    <textarea name="client-measures" rows="4" class="form-control">{{ change.client_measures or "" }}</textarea>
+                    <br>
+                    <button type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
+                    <span class="message"></span>
+                </div>
+                <br><br>
+
+                {% set evaluation_status_options = ['completed', 'partial', 'incomplete', 'not evaluated', 'n.a.'] %}
+                
+                {# Client Evaluation Status #}
+                <label for="client-status"><b>Evaluation Status (Client)</b></label>
+                <br>
+                <select name="client-status" class="evaluation-status-select">
+                    {% for option in evaluation_status_options %}
+                        <option {% if change.client_evaluation_status == option %} selected {% endif %}>
+                            {{ option }}
+                        </option>
+                    {% endfor %}
+                </select>
             </div>
+            <div class="col text-start">
+
+                {# Infrastructure Reasoning #}
+                <div>
+                    <label for="infra-reasoning"><b>Infrastructure Reasoning</b></label>
+                    <textarea name="infra-reasoning" rows="4" class="form-control">{{ change.infra_reasoning or "" }}</textarea>
+                    <br>
+                    <button type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
+                    <span class="message"></span>
+                </div>
+                <br><br>
+
+
+                {# Infrastructure Measures #}
+                <div>
+                    <label for="infra-measures"><b>Infrastructure Measures</b></label>
+                    <textarea name="infra-measures" rows="4" class="form-control">{{ change.infra_measures or "" }}</textarea>
+                    <br>
+                    <button type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
+                    <span class="message"></span>
+                </div>
+                <br><br>
+
+                {# Infrastructure Evaluation Status #}
+                <label for="infra-status"><b>Evaluation Status (Infrastructure)</b></label>
+                <br>
+                <select name="infra-status" class="evaluation-status-select">
+                    {% for option in evaluation_status_options %}
+                        <option {% if change.infra_evaluation_status == option %} selected {% endif %}>
+                            {{ option }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col text-start">
+
+                {# Service Reasoning #}
+                <div>
+                    <label for="service-reasoning"><b>Service Reasoning</b></label>
+                    <textarea name="service-reasoning" rows="4" class="form-control">{{ change.service_reasoning or "" }}</textarea>
+                    <br>
+                    <button type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
+                    <span class="message"></span>
+                </div>
+                <br><br>
+
+                {# Service Measures #}
+                <div>
+                    <label for="service-measures"><b>Service Measures</b></label>
+                    <textarea name="service-measures" rows="4" class="form-control">{{ change.service_measures or "" }}</textarea>
+                    <br>
+                    <button type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
+                    <span class="message"></span>
+                </div>
+                <br><br>
+
+                {# Service Evaluation Status #}
+                <label for="service-status"><b>Evaluation Status (Service)</b></label>
+                <br>
+                <select name="service-status" class="evaluation-status-select">
+                    {% for option in evaluation_status_options %}
+                        <option {% if change.service_evaluation_status == option %} selected {% endif %}>
+                            {{ option }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
         </div>
     </div>
 </div>
@@ -145,32 +370,40 @@
         </div>
     </div>
     <br><br>
-
+    
     {# Descriptions #}
     <div class="row">
         {% if change.old_description %}
-        <div class="col-sm">
+        <div class="d-flex justify-content-center pb-5">
+
+        </div>
+
+
+        <div class="col" style="width: 50%;">
             <h1>Old Description</h1>
             <div id="old-description">
                 {{ change.old_description | markdown | safe }}
             </div>
         </div>
-        <div class="col-sm">
-            <h1>New Description</h1>
+        <div class="col" style="width: 50%;">
+            <h1>
+                New Description
+                <button id="diff-button" class="btn btn-secondary" style="display:inline-block">
+                    <b>Show Diff</b>
+                </button>
+            </h1>
+
             <div id="new-description">
                 {{ change.new_description | markdown | safe }}
             </div>
         </div>
-
         {% else %}
-        <div class="col-sm">
+        <div class="col">
             <h1>Description</h1>
-
             {% if change.change_category != "additions" %}
             <b><i>(Description is identical to previous version)</i></b>
             <br><br>
             {% endif %}
-
             <div id="new-description">
                 {{ change.new_description | markdown | safe }}
             </div>
