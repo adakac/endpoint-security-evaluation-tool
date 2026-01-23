@@ -5,9 +5,12 @@
 */
 const from_version = $("#data").data("from-version");
 const to_version = $("#data").data("to-version");
+const mitre_id = $("#mitre-id").text();
 const url_status = $("#data").data("url-status");
 const url_classification = $("#data").data("url-classification");
 const url_links = $("#data").data("url-links");
+const url_evaluation_status = $("#data").data("url-evaluation-status");
+const url_change_reasoning_and_measures = $("#data").data("url-reasoning-and-measures");
 
 /*
 =====================================================================================
@@ -29,8 +32,8 @@ function setEventListenerDiffButton() {
         const old_description = $("#old-description p, #old-description li");
         const new_description = $("#new-description p, #new-description li");
 
+        // No difference found.
         if (original_old_description == original_new_description) {
-            console.log("No Diffs found.");
             return;
         }
 
@@ -64,13 +67,20 @@ function setEventListenerDiffButton() {
     });
 }
 
+
+/*
+=====================================================================================
+| When the classification of a technique is changed, this function updates it in    |
+| the backend as well in the frontend.                                              |
+=====================================================================================
+*/
 function setEventListenerClassification() {
     $(".classification").on("change", function() {
         const data = {
             from_version: from_version,
             to_version: to_version,
-            mitre_id: $("#mitre-id").text(),
-            target: $(this).attr("id"),
+            mitre_id: mitre_id,
+            target: $(this).attr("id"), // "client-criticality", "confidentiality", etc...
             value: $(this).val()
         }
         $.ajax({
@@ -88,7 +98,12 @@ function setEventListenerClassification() {
     });
 }
 
-// Set prev link on a tag:
+/*
+=====================================================================================
+| This function dynamically gets and sets the links of the previous and next items  |
+| depending on the active filter (e.g. "Done", "In Progress", "Not Done").          |
+=====================================================================================
+*/
 function setPrevAndNextLink() {
     // Get current filter of current upgrade.
     let filter = localStorage.getItem(`filter-${from_version}-${to_version}`);
@@ -97,7 +112,7 @@ function setPrevAndNextLink() {
     let data = {
         from_version: from_version,
         to_version: to_version,
-        mitre_id: $("#mitre-id").text(),
+        mitre_id: mitre_id,
         filter: filter
     }
 
@@ -110,7 +125,6 @@ function setPrevAndNextLink() {
         dataType: "json",
         success: function(response) {
             // Set previous and next link if they exist. If they don't exist add the links to the 'disabled' class.
-            console.log(response);
             if (response.prev_url) {
                 $("#prev").attr("href", response.prev_url);
             } else {
@@ -126,15 +140,126 @@ function setPrevAndNextLink() {
     });
 }
 
+/*
+=====================================================================================
+| This function gets and sets the currently active filter from LocalStorage.        |
+=====================================================================================
+*/
 function showCurrentFilter() {
     let filter = localStorage.getItem(`filter-${from_version}-${to_version}`);
+    
+    // Default is "All".
     if (filter === null) {
         filter = "All";
     }
+
     $("#filter").html(`<b>Filter</b>: ${filter}`);
 }
+
+
+
+/*
+=====================================================================================
+| This function changes the evaluation status in the backend.                       |
+=====================================================================================
+*/
+function setEventListenerEvaluationStatus() {
+    $(".evaluation-status-select").on("change", function() {
+        const target = $(this).attr("name"); // e.g. Client/Infra/Service Evaluation Status
+        const value = $(this).val(); // e.g. evaluated, not evaluated, partial, ...
+        
+        const data = {
+            from_version: from_version,
+            to_version: to_version,
+            mitre_id: mitre_id,
+            target: target,
+            value: value
+        }
+
+        $.ajax({
+            url: url_evaluation_status,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify(data)
+        })
+    });
+}
+
+
+
+/*
+=====================================================================================
+| This function saves the measures or the reasoning to the backend and displays a   |
+| message if successful.                                                            |
+=====================================================================================
+*/
+function setEventListenerReasoningAndMeasures() {
+    $(".measures-button, .reasoning-button").on("click", function() {
+        // Get the nearest textarea to the button.
+        textarea = $(this).siblings("textarea");
+
+        // Get the text.
+        text = textarea.val();
+        target = textarea.attr("name"); // e.g. Client/Infra/Service Measures/Reasoning
+
+        // Get <span> element for status message.
+        const message_element = $(this).siblings("span.message");
+
+        const data = {
+            from_version: from_version,
+            to_version: to_version,
+            mitre_id: mitre_id,
+            target: target,
+            text: text
+        }
+
+        $.ajax({
+            url: url_change_reasoning_and_measures,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify(data),
+            success: function(response) {
+                // Show message for 2 seconds in color (success=green).
+                message_element.removeClass("error");
+                message_element.addClass("success");
+                message_element.text(response.message);
+                setTimeout(() => { message_element.text(""); }, 2000);
+            }
+        });
+    });
+}
+
+
+/*
+=====================================================================================
+| Sets and saves the state (expanded or not expanded) of the collapsable assessment |
+| container. By default the container is not expanded.                              |
+=====================================================================================
+*/
+function toggleAssessmentContainer() {
+    assessment_container = $("#assessment");
+    toggle_element = $("#toggle-assessment");
+
+    // Restore.
+    is_expanded = localStorage.getItem("expanded") === "true";
+    if (is_expanded) {
+        assessment_container.addClass("show");
+        toggle_element.attr("aria-expanded", "true");
+    }
+
+    // Save changes on click.
+    $("#toggle-assessment").on("click", function() {
+        expanded = $(this).attr("aria-expanded");
+        localStorage.setItem("expanded", expanded);
+    });
+}
+
+
 
 setEventListenerDiffButton();
 setEventListenerClassification();
 setPrevAndNextLink();
 showCurrentFilter();
+setEventListenerEvaluationStatus();
+setEventListenerReasoningAndMeasures();
+toggleAssessmentContainer();
