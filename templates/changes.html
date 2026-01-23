@@ -18,38 +18,64 @@
 {% set percentage = (done_count / items_count * 100) | round(2) %}
 
 {% block content %}
-<div id="data" style="overflow: auto;" data-page="changes.html" data-from-version="{{ from_version }}" data-to-version="{{ to_version }}" data-url-status="{{ url_for('change_status') }}">
-    <div style="float: left; width: 500px;">
-        <h1 id="status-total">Progress: {{ percentage }}%</h1>
-        <h3>{{ from_version }} to {{ to_version }}</h3>
-        <br>
-        <div>
-            <div id="message" class="alert alert-primary alert-dismissible fade show" role="alert" style="display: none; width: 100%;">
-                <p id="message-text"></p>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+<div id="data"
+        data-page="changes.html"
+        data-from-version="{{ from_version }}"
+        data-to-version="{{ to_version }}"
+        data-url-status="{{ url_for('change_status') }}"
+        data-url-file-upload="{{ url_for('upload_file') }}"
+        data-url-file-export="{{ url_for('export_file') }}"
+    >
+    <div class="row">
+        {# Headings and buttons for uploading/exporting .xlsx/.ods files. #}
+        <div class="col" style="float: left;">
+            <h1 id="status-total">Progress: {{ percentage }}%</h1>
+            <h3>{{ from_version }} to {{ to_version }}</h3>
+            <br>
+            <div>
+                <div id="message" class="alert alert-primary alert-dismissible fade show py-2" role="alert" style="display: none; width: 100%;">
+                    <p id="message-text" style="margin: 6px 0;"></p>
+                    <button type="button" class="btn-close"data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
             </div>
+            <h4>
+                Import Spreadsheet File
+                <i class="bi bi-exclamation-triangle fs-6"
+                    data-bs-toggle="tooltip"
+                    data-bs-html="true"
+                    data-bs-placement="right"
+                    title="
+                        <p><b>Caution</b></p>
+                        <p>All Criticality Scores, Reasonings and Measures will be overwritten on import.</p>
+                    "
+                ></i>
+            </h4>
+            <p class="no-spacing">Current file: {{ file_name }}</p>
+            <br>
+            <input id="file-input" type="file" accept=".xlsx,.ods">
+            <br><br>
+            <button id="upload-btn" class="btn btn-primary">Import</button>
+            <button id="export-btn" class="btn btn-secondary">Export</button>
         </div>
-        <label for="file-input">Upload Spreadsheet File (In Progress):</label>
-        <br>
-        <input id="file-input" type="file" accept=".xlsx,.ods">
-        <br><br>
-        <button id="upload-btn" class="btn btn-primary">Upload</button>
-    </div>
 
-    <div style="float: right;">
-        <h1>Filter:</h1>
-        <div class="btn-group" role="group">
-            <input type="radio" class="btn-check" name="btnradio" id="btnradio1" checked>
-            <label class="btn btn-outline-primary" for="btnradio1">All</label>
-
-            <input type="radio" class="btn-check" name="btnradio" id="btnradio2">
-            <label class="btn btn-outline-primary" for="btnradio2">Done</label>
-
-            <input type="radio" class="btn-check" name="btnradio" id="btnradio3">
-            <label class="btn btn-outline-primary" for="btnradio3">In Progress</label>
-
-            <input type="radio" class="btn-check" name="btnradio" id="btnradio4">
-            <label class="btn btn-outline-primary" for="btnradio4">Not Done</label>
+        {# Filter buttons. #}
+        <div class="col" style="float: right;">
+            <div style="float: right;">
+                <h1>Filter:</h1>
+                <div class="btn-group" role="group">
+                    <input type="radio" class="btn-check" name="btnradio" id="btnradio1" checked>
+                    <label class="btn btn-outline-primary" for="btnradio1">All</label>
+        
+                    <input type="radio" class="btn-check" name="btnradio" id="btnradio2">
+                    <label class="btn btn-outline-primary" for="btnradio2">Done</label>
+        
+                    <input type="radio" class="btn-check" name="btnradio" id="btnradio3">
+                    <label class="btn btn-outline-primary" for="btnradio3">In Progress</label>
+        
+                    <input type="radio" class="btn-check" name="btnradio" id="btnradio4">
+                    <label class="btn btn-outline-primary" for="btnradio4">Not Done</label>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -63,10 +89,11 @@
         {% set items_count = items | count %}  
         {% set done_count = items | selectattr("status", "equalto", "Done") | list | count %}
         {% set percentage = (done_count / items_count * 100) | round(2) %}
-        
+
         <h2>{{ title }} ({{ items_count }})</h2>
         <h4 id="status-{{ key }}">Progress: {{ percentage }}%</h4>
 
+        {# Overview table of all changes in this upgrade. #}
         <table class="table table-striped table-bordered table-hover">
             <thead>
                 <tr style="vertical-align: middle;">
@@ -83,14 +110,15 @@
             </thead>
             <tbody style="vertical-align: middle;">
             {% for i in items %}
+                {# Dots are invalid in IDs, so replace them. #}
+                {% set mitre_id = i.mitre_id | replace('.', '-') %}
+
                 <tr>
                     {# Replace "." with "-" in IDs or else it could cause problems with CSS selectors. #}
-                    <td><a id="mitre-link-{{ i.mitre_id | replace('.', '-') }}" class="mitre-link" href="{{ url_for('change', from_version=from_version, to_version=to_version, mitre_id=i.mitre_id) }}">{{ i.mitre_id }}</a></td>
-                    {# Transform the category string (e.g. 'privilege-escalation' -> 'Privilege Escalation') #}
+                    <td><a id="mitre-link-{{ mitre_id }}" class="mitre-link" href="{{ url_for('change', from_version=from_version, to_version=to_version, mitre_id=i.mitre_id) }}">{{ i.mitre_id }}</a></td>
                     <td>{{ i.tactics }}</td>
                     <td>{{ i.technique }}</td>
-                    {# If 'i.sub_technique' is empty, use '-'. #}
-                    <td>{{ i.sub_technique or "−" }}</td>
+                    <td>{{ i.sub_technique or "−" }}</td> {# If empty, use "". #}
                     <td>{{ i.client_criticality_sum }}</td>
                     <td>{{ i.infra_criticality_sum }}</td>
                     <td>{{ i.service_criticality_sum }}</td>
@@ -103,8 +131,6 @@
                         </select>
                     </td>
                     <td>
-                        {# Dots are invalid in IDs. #}
-                        {% set mitre_id = i.mitre_id | replace('.', '-') %}
                         {% set icon_class = "bi-check" if i.status == 'Done' else "bi-hourglass-split" if i.status == 'In Progress' else "bi-ban" %}
                         {% set color = "text-success" if i.status == 'Done' else "text-warning" if i.status == 'In Progress' else "text-danger" %}
                         <i id="icon-{{ mitre_id }}" class="bi {{ icon_class }} {{ color }} fs-4"></i>
@@ -118,51 +144,8 @@
 {% endblock %}
 
 {% block scripts_bottom %}
+<script src="{{ url_for('static', filename='changes.js') }}"></script>
 <script src="{{ url_for('static', filename='scroll_position.js') }}"></script>
 <script src="{{ url_for('static', filename='filter.js') }}"></script>
 <script src="{{ url_for('static', filename='status.js') }}"></script>
-
-<script>
-    // Handle file upload
-    const upload_btn = $("#upload-btn");
-    let file_input = $("#file-input");
-
-    upload_btn.on("click", function() {
-        let file = file_input.prop("files")[0];
-        
-        if (!file) {
-            alert("Select a file first");
-            return;
-        }
-        
-        const form_data = new FormData();
-        const from_version = $("#data").data("from-version");
-        const to_version = $("#data").data("to-version");
-        form_data.append("file", file);
-        form_data.append("from_version", from_version);
-        form_data.append("to_version", to_version);
-
-        $.ajax({
-            url: "/api/upload-file",
-            type: "POST",
-            data: form_data,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                $("#message").removeClass("alert-danger");
-                $("#message").addClass("alert-primary");
-                $("#message").toggle();
-                $("#message-text").text(response.message);
-            },
-            error: function(xhr, status, error) {
-                message = xhr.responseJSON.message;
-                $("#message").removeClass("alert-primary");
-                $("#message").addClass("alert-danger");
-                $("#message").toggle();
-                $("#message-text").text(message);
-            }
-        })
-    });
-
-</script>
 {% endblock %}
