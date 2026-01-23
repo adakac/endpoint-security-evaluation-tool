@@ -8,15 +8,26 @@ const to_version = $("#data").data("to-version");
 
 
 // Set EventListener on the filter buttons.
+
+
+/*
+=====================================================================================
+| Sets an EventListener on the Filter buttons. If a filter is activated (e.g. all   |
+| changes that are "Done") all other changes are hidden.                            |
+=====================================================================================
+*/
 function setEventListenerFilter() {
     $('input[name="btnradio"]').on("click", function() {
         const id = $(this).attr("id");
         const label_text = $(`label[for=${id}]`).text();
         
+        // If "All" show all <tr> elements of all the changes.
         if (label_text == "All") {
             $(".status-select").each(function() {
                 $(this).closest("tr").show();
             });
+
+        // If anything else, hide the <tr> elements of the changes that are excluded by the filter.
         } else {
             $(".status-select").each(function() {
                 if ($(this).val() === label_text) {
@@ -27,13 +38,20 @@ function setEventListenerFilter() {
             });
         }
 
-        // Save the filter for the current upgrade.
+        // Save the filter for the current upgrade in LocalStorage.
         localStorage.setItem(`filter-${from_version}-${to_version}`, label_text);
     });
 }
 
-// Restore filter on site reload.
+
+
+/*
+=====================================================================================
+| Gets and restores the current filter on site reload.                              |
+=====================================================================================
+*/
 function restoreFilter() {
+    // Get the current filter from LocalStorage.
     let filter = localStorage.getItem(`filter-${from_version}-${to_version}`);
 
     // If filter is "All" or no filter is set, show everything.
@@ -41,6 +59,8 @@ function restoreFilter() {
         $(".status-select").each(function() {
             $(this).closest("tr").show();
         });
+    
+    // Else, activate the filter by hiding all elements that are excluded by the filter.
     } else {
         $(".status-select").each(function() {
             if ($(this).val() === filter) {
@@ -62,6 +82,8 @@ function restoreFilter() {
         $("#btnradio4").prop("checked", true);
     }
 }
+
+
 
 setEventListenerFilter();
 restoreFilter();
