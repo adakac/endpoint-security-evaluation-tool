@@ -32,10 +32,19 @@ class MITREChange(Base):
     availability = Column(Boolean, default=False)
     client_criticality = Column(Integer, default=0)
     client_criticality_sum = Column(Integer, default=0)
+    client_reasoning = Column(Text)
+    client_measures = Column(Text)
+    client_evaluation_status = Column(Text, default="not evaluated")
     infra_criticality = Column(Integer, default=0)
     infra_criticality_sum = Column(Integer, default=0)
+    infra_reasoning = Column(Text)
+    infra_measures = Column(Text)
+    infra_evaluation_status = Column(Text, default="not evaluated")
     service_criticality = Column(Integer, default=0)
     service_criticality_sum = Column(Integer, default=0)
+    service_reasoning = Column(Text)
+    service_measures = Column(Text)
+    service_evaluation_status = Column(Text, default="not evaluated")
 
 
 
