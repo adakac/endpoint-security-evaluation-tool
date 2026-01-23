@@ -1,4 +1,8 @@
-// Get the next version and helping text for the user.
+/*
+=====================================================================================
+| Determine the version and display a help text for the user.                       |
+=====================================================================================
+*/
 $("#version_select").on("change", function() {
     // Get all option elements from the dropdown menu and execute the val() function on each one,
     // to get their value. Then execute get() to get a JavaScript array.
@@ -19,7 +23,13 @@ $("#version_select").on("change", function() {
     }
 });
 
-// Call the backend function to initiate an upgrade.
+
+
+/*
+=====================================================================================
+| Call the backend function to initiate an upgrade.                                 |
+=====================================================================================
+*/
 $("#upgrade_form").on("submit", function(e) {
     e.preventDefault();
     $.ajax({
@@ -30,7 +40,13 @@ $("#upgrade_form").on("submit", function(e) {
             $("#status-message").html(response.message);
             $("#status").removeClass("alert-warning").addClass("alert-primary");
             $("#status").show();
-            $("#upgrades").prepend(`<li><a href=${response.url} target="_blank">${response.url_text}</a></li>`);
+            $("#upgrades").prepend(`
+                <li>
+                    <a href=${response.url} target="_blank">
+                        ${response.url_text}
+                    </a>
+                </li>`
+            );
         },
         error: function(xhr) {
             console.log(xhr);
