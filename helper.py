@@ -1,10 +1,16 @@
 from table_definitions import *
-from sqlalchemy import select, asc, desc
+from sqlalchemy import select, asc
 from sqlalchemy.orm import Session
 from requests import get
 from glom import glom
 import json, re
-
+from os import path
+from pathlib import Path
+from werkzeug.datastructures import FileStorage
+from magic import from_buffer
+from constants import *
+from ods import *
+from xlsx import *
 
 
 '''
@@ -24,8 +30,7 @@ def parse_version_changes(from_version: str, to_version: str) -> list:
         attack_data.raise_for_status()
         attack_data = attack_data.json()
     except:
-        print("TIMEOUT")
-        return
+        raise Exception("Request failed or timed out. Try again later.")
 
     # A JSON changelog is only available for versions greater than v8.0.
     if not changelog:
@@ -139,6 +144,21 @@ def parse_version_changes(from_version: str, to_version: str) -> list:
     return result
 
 
+
+'''
+=====================================================================================
+| Small helper function that handles json.loads() errors and returns a default      |
+| value on error.                                                                   |
+=====================================================================================
+'''
+def load_json(json_string, default=None):
+    try:
+        return json.loads(json_string) if json_string else default
+    except json.JSONDecodeError:
+        return default
+
+
+
 '''
 =====================================================================================
 | The function is given a version and determines which version is next.             |
@@ -199,7 +219,8 @@ def get_changes(from_version: str, to_version: str, db: Session):
         select(MITREChange) \
         .where(
             (MITREChange.from_version == from_version) &
-            (MITREChange.to_version == to_version)
+            (MITREChange.to_version == to_version) &
+            (MITREChange.nr_sub_techniques == 0)
         ) \
         .order_by(
             asc(MITREChange.tactics),
@@ -210,7 +231,11 @@ def get_changes(from_version: str, to_version: str, db: Session):
 
 
 
-# get one particular change from db.
+'''
+=====================================================================================
+| Get one particular change from the DB.                                            |
+=====================================================================================
+'''
 def get_change(db: Session, from_version: str, to_version: str, mitre_id: str) -> MITREChange:
     return db.scalar(
         select(MITREChange) \
@@ -222,7 +247,12 @@ def get_change(db: Session, from_version: str, to_version: str, mitre_id: str) -
     )
 
 
-
+'''
+=====================================================================================
+| Find out the change that comes before 'current_change' in the alphabetical order  |
+| (tactics, techniques, sub-techniques in ascending order).                         |
+=====================================================================================
+'''
 def get_previous_change(db: Session, current_change: MITREChange, filter: str) -> MITREChange:
     # If filer is "All" or there is no filter set, check all changes.
     if filter == "All" or not filter:
@@ -259,7 +289,6 @@ def get_previous_change(db: Session, current_change: MITREChange, filter: str) -
     index = next(
         i for i, r in enumerate(results)
         if r.mitre_id == current_change.mitre_id
-        and r.tactics == current_change.tactics
     )
 
     # If index is 0, there is no previous change, so return 'None'.
@@ -268,8 +297,12 @@ def get_previous_change(db: Session, current_change: MITREChange, filter: str) -
 
 
 
-
-
+'''
+=====================================================================================
+| Find out the change that comes next to 'current_change' in the alphabetical order |
+| (tactics, techniques, sub-techniques in ascending order).                         |
+=====================================================================================
+'''
 def get_next_change(db: Session, current_change: MITREChange, filter: str) -> MITREChange:
     if filter == "All" or not filter:
         query = select(MITREChange) \
@@ -315,6 +348,28 @@ def get_next_change(db: Session, current_change: MITREChange, filter: str) -> MI
 
 '''
 =====================================================================================
+| This function checks if the user has already uploaded a spreadsheet file for      |
+| this upgrade. If yes, the function returns the filename and the extension.        |
+=====================================================================================
+'''
+def get_spreadsheet_filename(from_version: str, to_version: str) -> str | None:
+    # Check if there's already a file for this upgrade.
+    file_name_ods = f"mitreattck_eval_{from_version}_{to_version}.ods"
+    file_name_xlsx = f"mitreattck_eval_{from_version}_{to_version}.xlsx"
+    file_path_ods = Path(path.join("sheets", file_name_ods))
+    file_path_xlsx = Path(path.join("sheets", file_name_xlsx))
+
+    if file_path_ods.exists():
+        return file_name_ods
+    elif file_path_xlsx.exists():
+        return file_name_xlsx
+    else:
+        return None
+
+
+
+'''
+=====================================================================================
 | Get all MITRE versions from the DB in a descending order.                         |
 =====================================================================================
 '''
@@ -336,9 +391,6 @@ def get_mitre_versions_db(db: Session):
 =====================================================================================
 '''
 def get_mitre_versions_api(db: Session):
-    # To get the MITRE versions, we could either scrape the website which is not the most stable idea, but we can get all versions currently available. Also the website only lists the newest minor version per major version.
-    # Alternatively, we can use the Github API to get all releases. But here we can only get MITRE versions from up to 8.0. Versions below were not pushed to Github.
-
     # Github API allows us to fetch all releases up from v8.0. Versions below were not pushed to Github by MITRE.
     req = get("https://api.github.com/repos/mitre/cti/releases")
 
@@ -381,6 +433,8 @@ def client_sum(change: MITREChange) -> int:
     sum = change.confidentiality + change.integrity + change.availability + change.client_criticality
     return sum
 
+
+
 def infra_sum(change: MITREChange) -> int:
     if change.infra_criticality == 0:
         return 0
@@ -388,9 +442,112 @@ def infra_sum(change: MITREChange) -> int:
     sum = change.confidentiality + change.integrity + change.availability + change.infra_criticality
     return sum
 
+
+
 def service_sum(change: MITREChange) -> int:
     if change.service_criticality == 0:
         return 0
 
     sum = change.confidentiality + change.integrity + change.availability + change.service_criticality
     return sum
+
+
+
+'''
+=====================================================================================
+| Checks if a file type is valid (XLSX or ODS). The function checks both the file   |
+| extension and the mimetype by reading the contents of the file.                   |
+=====================================================================================
+'''
+# 
+def is_xlsx_or_ods(file: FileStorage) -> Boolean:
+    # Get the file extension.
+    file_ext = file.filename.lower().split(".")[-1]
+
+    # Find out mimetype by reading the contents of the file.
+    file_bytes = file.read()
+    file.seek(0)
+    mimetype = from_buffer(file_bytes, mime=True)
+
+    # Check the file. Only ods and xlsx is allowed.
+    allowed_extensions = ["ods", "xlsx"]
+    allowed_mimetypes = [
+        # ODS
+        "application/vnd.oasis.opendocument.spreadsheet",
+        # XLSX
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        # XLSX files are basically ZIP files and are sometimes detected as application/zip.
+        "application/zip"
+    ]
+
+    return file_ext in allowed_extensions and mimetype in allowed_mimetypes
+
+
+
+'''
+=====================================================================================
+| This function constructs a unique filename, checks if the filetype is valid,      |
+| removes any other spreadsheet files that may exist and saves it to local disk.    |
+=====================================================================================
+'''
+def handle_upload(file: FileStorage, from_version: str, to_version: str):
+    file_ext = file.filename.split(".")[-1]
+
+    if not is_xlsx_or_ods(file):
+        raise Exception("Unsupported Filetype")
+    
+    file_name = f"mitreattck_eval_{from_version}_{to_version}"
+    file_path = path.join("sheets", f"{file_name}.{file_ext}")
+    file.save(file_path)
+
+    # If an ods file exists and a xlsx file is uploaded remove the ods file and vice versa.
+    # If a xlsx file exists and a xlsx file is uploaded, it simply gets overwritten.
+    if file_ext == "ods":
+        file_remove_path = Path(path.join("sheets", f"{file_name}.xlsx"))
+    elif file_ext == "xlsx":
+        file_remove_path = Path(path.join("sheets", f"{file_name}.ods"))
+
+    try:
+        file_remove_path.unlink()
+    except FileNotFoundError:
+        pass
+
+    return file_path
+
+
+
+def import_file(file_path: str, from_version: str, to_version: str, db: Session):
+    file_ext = file_path.split(".")[-1]
+    sheet_name = "MITRE_ATT&CK"
+
+    changes = get_changes(from_version, to_version, db)
+
+    if file_ext == "xlsx":
+        handler = XLSXHandler(file_path=file_path, sheet_name=sheet_name, db=db)
+        handler.import_xlsx(changes)
+
+    elif file_ext == "ods":
+        handler = ODSHandler(file_path=file_path, sheet_name=sheet_name, db=db)
+        handler.import_ods(changes)
+
+
+
+def export_file(from_version: str, to_version: str, db: Session) -> str:
+    # Get the current spreadsheet file for this upgrade.
+    file_name = get_spreadsheet_filename(from_version, to_version)
+    file_ext = file_name.split(".")[-1]
+    file_path = path.join("sheets", file_name)
+    sheet_name = "MITRE_ATT&CK"
+
+    export_name = f"EXPORT_{file_name}"
+    export_path = path.join("sheets", export_name)
+
+    # Get all changes that were made during this upgrade.
+    changes = get_changes(from_version, to_version, db)
+
+    if file_ext == "xlsx":
+        handler = XLSXHandler(file_path=file_path, sheet_name=sheet_name, db=db)
+        handler.export_xlsx(file_path=export_path, changes=changes)
+    elif file_ext == "ods":
+        handler = ODSHandler(file_path=file_path, sheet_name=sheet_name, db=db)
+        handler.export_ods(file_path=export_path, changes=changes)
