@@ -30,26 +30,40 @@
 </head>
 
 <body>
-    <!-- TODO: Finish navbar -->
-    <!-- https://getbootstrap.com/docs/5.3/components/navbar/ -->
+    {# Navbar at the top #}
     <nav class="navbar navbar-expand-lg bg-primary-subtle sticky-top">
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('homepage' )}}">
                 <i class="bi bi-house"></i>
                 Home
             </a>
-            <button class="btn btn-secondary" id="theme">Change theme</button>
+            {% block navbar_elements %}
+            {% endblock %}
         </div>
     </nav>
     
+    {# Actual content will be displayed here by all templates that extend the base template. #}
     <div style="margin: 20px;">
         {% block content %}
         {% endblock %}
     </div>
 
+    {# Footer #}
+    <footer class="bg-primary-subtle fixed-bottom navbar navbar-expand">
+        <div class="container-fluid">
+            <div class="d-flex">
+                ESE Update Tool
+            </div>
+            <button class="btn btn-secondary" id="theme">Change theme</button>
+        </div>
+    </footer>
+
     {# Bootstrap JS #}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
     
+    {# Activates Bootstrap tooltips. #}
+    <script src="{{ url_for('static', filename='tooltips.js') }}"></script>
+
     {% block scripts_bottom %}
     {% endblock %}
 </body>
