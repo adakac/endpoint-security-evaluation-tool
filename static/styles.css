@@ -1,3 +1,11 @@
+/* Create space for the footer */
+body {
+    margin-bottom: 70px;
+}
+div {
+    margin: 0;
+    padding: 0;
+}
 #version_select {
     width: 100px;
     margin: 10px 0px;
@@ -18,8 +26,10 @@
 .btn {
     min-width: 100px;
 }
-
-
+.no-spacing {
+    margin: 0;
+    padding: 0;
+}
 /* Formats for showing the diff between two texts. */
 .added, .added p, .added li {
   background-color: #B4D5FF; /* highlight for added text */
@@ -32,21 +42,18 @@
   color: #000000;
 }
 
-
-/* Highlights a table row. */
+/* For highlighting a table row. */
 .highlight td, .highlight a {
     background-color: #88E788 !important;
     color: #2A2A2A !important;
     font-weight: bold;
 }
 
-
-/* Disabled button with a diagonal line through it. */
+/* For disabled buttons with a diagonal line through it. */
 .btn.disabled {
     position: relative;
     overflow: hidden;
 }
-
 .btn.disabled::after {
     content: "";
     position: absolute;
@@ -58,7 +65,48 @@
     transform: rotate(-15deg);
 }
 
-
+/* Width of input fields. */
 input[type="number"] {
     width: 100px;
+}
+
+/* Tooltips. See https://getbootstrap.com/docs/5.0/components/tooltips/ */
+.tooltip .tooltip-inner {
+    text-align: left;
+    max-width: 320px;
+}
+.tooltip ul {
+    padding-left: 1rem;
+    margin-bottom: 0;
+}
+
+/* Rotate icon if clicked. */
+.toggle-icon {
+    transition: transform 0.3s;
+    display: inline-block;
+}
+[data-bs-toggle="collapse"][aria-expanded="true"] .toggle-icon {
+    transform: rotateZ(180deg);
+}
+
+/* Colors for success and error messages. */
+.success {
+    font-weight: bold;
+    color: green;
+}
+.error {
+    font-weight: bold;
+    color: red;
+}
+
+/* Buttons for saving textarea fields. */
+.reasoning-button, .measures-button {
+    min-width: 20%;
+}
+
+/* Container */
+#assessment {
+    border: 2px solid var(--bs-border-color); /* Same color as table border */
+    padding: 40px;
+    border-radius: 20px;
 }
