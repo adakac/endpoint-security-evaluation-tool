@@ -229,16 +229,20 @@
         </div>
 
         <br><br>
-        <h3>Measures</h3>
+        <h3>Evaluation</h3>
         <div class="row">
             <div class="col text-start">
+                {# Disable forms if criticality is 0. #}
+                {% set client_disabled = change.client_criticality == 0 %}
 
                 {# Client Reasoning #}
                 <div>
                     <label for="client-reasoning"><b>Client Reasoning</b></label>
-                    <textarea name="client-reasoning" rows="4" class="form-control">{{ change.client_reasoning or "" }}</textarea>
+                    <textarea id="client-reasoning" name="client-reasoning" rows="4" class="form-control" {% if client_disabled %} disabled {% endif %}>
+                        {{ change.client_reasoning or "" }}
+                    </textarea>
                     <br>
-                    <button type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
+                    <button id="client-reasoning-btn" type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
                     <span class="message"></span>
                 </div>
                 <br><br>
@@ -246,9 +250,11 @@
                 {# Client Measures #}
                 <div>
                     <label for="client-measures"><b>Client Measures</b></label>
-                    <textarea name="client-measures" rows="4" class="form-control">{{ change.client_measures or "" }}</textarea>
+                    <textarea id="client-measures" name="client-measures" rows="4" class="form-control" {% if client_disabled %} disabled {% endif %}>
+                        {{ change.client_measures or "" }}
+                    </textarea>
                     <br>
-                    <button type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
+                    <button id="client-measures-btn" type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
                     <span class="message"></span>
                 </div>
                 <br><br>
@@ -258,22 +264,26 @@
                 {# Client Evaluation Status #}
                 <label for="client-status"><b>Evaluation Status (Client)</b></label>
                 <br>
-                <select name="client-status" class="evaluation-status-select">
+                <select id="client-status" name="client-status" class="evaluation-status-select" {% if client_disabled %} disabled {% endif %}>
                     {% for option in evaluation_status_options %}
-                        <option {% if change.client_evaluation_status == option %} selected {% endif %}>
+                        <option value="{{ option }}" {% if change.client_evaluation_status == option %} selected {% endif %}>
                             {{ option }}
                         </option>
                     {% endfor %}
                 </select>
             </div>
             <div class="col text-start">
+                {# Disable all forms if criticality is 0. #}
+                {% set infra_disabled = change.infra_criticality == 0 %}
 
                 {# Infrastructure Reasoning #}
                 <div>
                     <label for="infra-reasoning"><b>Infrastructure Reasoning</b></label>
-                    <textarea name="infra-reasoning" rows="4" class="form-control">{{ change.infra_reasoning or "" }}</textarea>
+                    <textarea id="infra-reasoning" name="infra-reasoning" rows="4" class="form-control" {% if infra_disabled %} disabled {% endif %}>
+                        {{ change.infra_reasoning or "" }}
+                    </textarea>
                     <br>
-                    <button type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
+                    <button id="infra-reasoning-btn" type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
                     <span class="message"></span>
                 </div>
                 <br><br>
@@ -282,9 +292,11 @@
                 {# Infrastructure Measures #}
                 <div>
                     <label for="infra-measures"><b>Infrastructure Measures</b></label>
-                    <textarea name="infra-measures" rows="4" class="form-control">{{ change.infra_measures or "" }}</textarea>
+                    <textarea id="infra-measures" name="infra-measures" rows="4" class="form-control" {% if infra_disabled %} disabled {% endif %}>
+                        {{ change.infra_measures or "" }}
+                    </textarea>
                     <br>
-                    <button type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
+                    <button id="infra-measures-btn" type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
                     <span class="message"></span>
                 </div>
                 <br><br>
@@ -292,22 +304,26 @@
                 {# Infrastructure Evaluation Status #}
                 <label for="infra-status"><b>Evaluation Status (Infrastructure)</b></label>
                 <br>
-                <select name="infra-status" class="evaluation-status-select">
+                <select id="infra-status" name="infra-status" class="evaluation-status-select" {% if infra_disabled %} disabled {% endif %}>
                     {% for option in evaluation_status_options %}
-                        <option {% if change.infra_evaluation_status == option %} selected {% endif %}>
+                        <option value="{{ option }}" {% if change.infra_evaluation_status == option %} selected {% endif %}>
                             {{ option }}
                         </option>
                     {% endfor %}
                 </select>
             </div>
             <div class="col text-start">
+                {# Disable forms when criticality is 0. #}
+                {% set service_disabled = change.service_criticality == 0 %}
 
                 {# Service Reasoning #}
                 <div>
                     <label for="service-reasoning"><b>Service Reasoning</b></label>
-                    <textarea name="service-reasoning" rows="4" class="form-control">{{ change.service_reasoning or "" }}</textarea>
+                    <textarea id="service-reasoning" name="service-reasoning" rows="4" class="form-control" {% if service_disabled %} disabled {% endif %}>
+                        {{ change.service_reasoning or "" }}
+                    </textarea>
                     <br>
-                    <button type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
+                    <button id="service-reasoning-btn" type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
                     <span class="message"></span>
                 </div>
                 <br><br>
@@ -315,9 +331,11 @@
                 {# Service Measures #}
                 <div>
                     <label for="service-measures"><b>Service Measures</b></label>
-                    <textarea name="service-measures" rows="4" class="form-control">{{ change.service_measures or "" }}</textarea>
+                    <textarea id="service-measures" name="service-measures" rows="4" class="form-control" {% if service_disabled %} disabled {% endif %}>
+                        {{ change.service_measures or "" }}
+                    </textarea>
                     <br>
-                    <button type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
+                    <button id="service-measures-btn" type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
                     <span class="message"></span>
                 </div>
                 <br><br>
@@ -325,9 +343,9 @@
                 {# Service Evaluation Status #}
                 <label for="service-status"><b>Evaluation Status (Service)</b></label>
                 <br>
-                <select name="service-status" class="evaluation-status-select">
+                <select id="service-status" name="service-status" class="evaluation-status-select" {% if service_disabled %} disabled {% endif %}>
                     {% for option in evaluation_status_options %}
-                        <option {% if change.service_evaluation_status == option %} selected {% endif %}>
+                        <option value="{{ option }}" {% if change.service_evaluation_status == option %} selected {% endif %}>
                             {{ option }}
                         </option>
                     {% endfor %}
@@ -374,11 +392,6 @@
     {# Descriptions #}
     <div class="row">
         {% if change.old_description %}
-        <div class="d-flex justify-content-center pb-5">
-
-        </div>
-
-
         <div class="col" style="width: 50%;">
             <h1>Old Description</h1>
             <div id="old-description">
