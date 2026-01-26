@@ -111,7 +111,7 @@ def initiate_upgrade():
         # If the current upgrade does not exist, get it from the MITRE site, parse it and store it in the DB.
         result = hp.parse_version_changes(from_version.name, to_version.name)
     except Exception as e:
-        return jsonify({"message": "An Error occured while getting information from MITRE. Please make sure you have an internet connection."}), 400
+        return jsonify({"message": str(e)}), 400
     
     # Iterate over all results and write them to DB.
     for c in result:
@@ -258,6 +258,7 @@ def change_classification():
     to_version = data.get("to_version")
     mitre_id = data.get("mitre_id")
     target = data.get("target")
+    eval_status = data.get("eval_status")
 
     # Get the change from the DB.
     change = hp.get_change(db, from_version, to_version, mitre_id)
@@ -268,10 +269,13 @@ def change_classification():
     # Update the according metric and write to the DB.
     if target == "client-criticality":
         change.client_criticality = int(data.get("value"))
+        change.client_evaluation_status = eval_status
     elif target == "infra-criticality":
         change.infra_criticality = int(data.get("value"))
+        change.infra_evaluation_status = eval_status
     elif target == "service-criticality":
         change.service_criticality = int(data.get("value"))
+        change.service_evaluation_status = eval_status
     elif target == "confidentiality":
         # Boolean value. If clicked change it to the opposite.
         change.confidentiality = not change.confidentiality
@@ -321,7 +325,7 @@ def upload_file():
         hp.import_file(file_path, from_version, to_version, db)
     except Exception as e:
         return jsonify({"message": str(e)}), 400
-
+    
     return jsonify({
         "message": "Successfully loaded and read file. Database is updated. Refresh the site to see the changes."
     }), 200
@@ -445,6 +449,5 @@ def change_reasoning_and_measures():
 | Start the flask server in debug mode and on port 8000.                            |
 =====================================================================================
 '''
-# TODO: Remove Debugging mode when going productive.
 if __name__ == "__main__":
-    app.run(debug=True, port=8000)
+    app.run(port=8000)
