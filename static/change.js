@@ -12,6 +12,8 @@ const url_links = $("#data").data("url-links");
 const url_evaluation_status = $("#data").data("url-evaluation-status");
 const url_change_reasoning_and_measures = $("#data").data("url-reasoning-and-measures");
 
+
+
 /*
 =====================================================================================
 | The following function implements the diff functionality to show the differences  |
@@ -68,20 +70,45 @@ function setEventListenerDiffButton() {
 }
 
 
+
 /*
 =====================================================================================
 | When the classification of a technique is changed, this function updates it in    |
 | the backend as well in the frontend.                                              |
 =====================================================================================
 */
+client_eval_status = $("#client-status").val();
+infra_eval_status = $("#infra-status").val();
+service_eval_status = $("#service-status").val();
 function setEventListenerClassification() {
     $(".classification").on("change", function() {
+        value = Number($(this).val());
+        target = $(this).attr("id");
+
+        // If value === 0, set the evaluation status to "n.a.".
+        if (value === 0) {
+            eval_status = "n.a.";
+            client_eval_status = $("#client-status").val();
+            infra_eval_status = $("#infra-status").val();
+            service_eval_status = $("#service-status").val();
+        // If value !== 0, restore the status.
+        } else if (value !== 0) {
+            if (target === "client-criticality") {
+                eval_status = client_eval_status;
+            } else if (target === "infra-criticality") {
+                eval_status = infra_eval_status;
+            } else if (target === "service-criticality") {
+                eval_status = service_eval_status;
+            }
+        }
+        
         const data = {
             from_version: from_version,
             to_version: to_version,
             mitre_id: mitre_id,
-            target: $(this).attr("id"), // "client-criticality", "confidentiality", etc...
-            value: $(this).val()
+            target: target, // "client-criticality", "confidentiality", etc...
+            value: value,
+            eval_status: eval_status
         }
         $.ajax({
             url: url_classification,
@@ -93,10 +120,48 @@ function setEventListenerClassification() {
                 $("#client-criticality-sum").text(response.client_criticality_sum);
                 $("#infra-criticality-sum").text(response.infra_criticality_sum);
                 $("#service-criticality-sum").text(response.service_criticality_sum);
+                
+                if (target === "client-criticality") {
+                    // Disable forms for Client Evaluation if Client Criticality is 0.
+                    if (response.client_criticality_sum === 0) {
+                        // Save the current status before changing, so we can easily restore it.
+                        $("#client-status").val(eval_status);
+                        $("#client-reasoning, #client-reasoning-btn, #client-measures, #client-measures-btn, #client-status").prop("disabled", true);
+                    // Enable forms for Client Evaluation if Client Criticality is not 0.
+                    } else if (response.client_criticality_sum > 0) {
+                        $("#client-status").val(eval_status);
+                        $("#client-reasoning, #client-reasoning-btn, #client-measures, #client-measures-btn, #client-status").prop("disabled", false);
+                    }
+                }
+                
+                if (target === "infra-criticality") {
+                    // Disable forms for Infrastructure Evaluation if Infrastructure Criticality is 0.
+                    if (response.infra_criticality_sum === 0) {
+                        $("#infra-status").val(eval_status);
+                        $("#infra-reasoning, #infra-reasoning-btn, #infra-measures, #infra-measures-btn, #infra-status").prop("disabled", true);
+                    // Enable forms for Infrastructure Evaluation if Infrastructure Criticality is not 0.
+                    } else if (response.infra_criticality_sum > 0) {
+                        $("#infra-status").val(eval_status);
+                        $("#infra-reasoning, #infra-reasoning-btn, #infra-measures, #infra-measures-btn, #infra-status").prop("disabled", false);
+                    }
+                }
+
+                if (target === "service-criticality") {
+                    // Disable forms for Service Evaluation if Service Criticality is 0.
+                    if (response.service_criticality_sum === 0) {
+                        $("#service-status").val(eval_status);
+                        $("#service-reasoning, #service-reasoning-btn, #service-measures, #service-measures-btn ,#service-status").prop("disabled", true);
+                    } else if (response.service_criticality_sum > 0) {
+                        $("#service-status").val(eval_status);
+                        $("#service-reasoning, #service-reasoning-btn, #service-measures, #service-measures-btn ,#service-status").prop("disabled", false);
+                    }
+                }
             }
-        })
+        });
     });
 }
+
+
 
 /*
 =====================================================================================
@@ -140,6 +205,8 @@ function setPrevAndNextLink() {
     });
 }
 
+
+
 /*
 =====================================================================================
 | This function gets and sets the currently active filter from LocalStorage.        |
@@ -167,6 +234,15 @@ function setEventListenerEvaluationStatus() {
     $(".evaluation-status-select").on("change", function() {
         const target = $(this).attr("name"); // e.g. Client/Infra/Service Evaluation Status
         const value = $(this).val(); // e.g. evaluated, not evaluated, partial, ...
+
+        // Save the current state in a variable.
+        if (target === "client-status") {
+            client_eval_status = value;
+        } else if (target == "infra-status") {
+            infra_eval_status = value;
+        } else if (target === "service-status") {
+            service_eval_status = value;
+        }   
         
         const data = {
             from_version: from_version,
