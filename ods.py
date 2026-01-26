@@ -1,6 +1,7 @@
 # Functions for reading and writing data to and from the ODS file.
 from odf.opendocument import load, OpenDocument
 from odf.table import Table, TableRow, TableCell
+from odf.namespaces import OFFICENS, TABLENS
 from odf.text import P
 from constants import *
 from table_definitions import *
@@ -30,20 +31,18 @@ class ODSHandler():
         self.doc: OpenDocument = load(file_path)
         self.sheet: Table = self.get_sheet(sheet_name)
 
-        # Row values, only for reading.
-        self.rows: list = self.read_rows(col_limit=26)
-
         # ODS row objects for directly manipulating the file.
         self.rows_ods = self.sheet.getElementsByType(TableRow)
-        
-        self.db: Session = db
+
+        # Row values, only for reading.
+        self.rows: dict = self.read_rows(col_limit=25)
 
         # Cleaning up empty rows and cells.
-        # Somehow the .ods file has lots of empty rows and cells that reach the row and column limit.
-        # This could cause problems when adding new rows and cells.
-        self.remove_empty_rows()
         self.remove_empty_cells()
+        self.remove_empty_rows()
+        self.expand_cells()
 
+        self.db: Session = db
 
 
     '''
@@ -96,6 +95,10 @@ class ODSHandler():
 
                 row_data.extend([value] * repeat_cell)
 
+            # Fill up to col_limit to avoid index errors.
+            while len(row_data) < col_limit:
+                row_data.append("")
+
             # Populate the hashtable and use the MITRE-ID as key.
             mitre_id = row_data[COL_MITREID]
             rows[mitre_id] = {"row_data": row_data, "row_index": row_index}
@@ -120,6 +123,7 @@ class ODSHandler():
             rows.append(new_row)
 
         target_row = rows[row_index]
+        target_row.setAttribute("numberrowsrepeated", 1)
 
         # Automatically expand the document if col_index is out of bounds by addings cells to the row.
         cells = target_row.getElementsByType(TableCell)
@@ -129,9 +133,27 @@ class ODSHandler():
             cells.append(new_cell)
         
         target_cell = cells[col_index]
+        target_cell.setAttribute("numbercolumnsrepeated", 1)
         
-        # Remove existing content.
-        target_cell.childNodes = []
+        # Remove all existing childnodes (e.g. P nodes for text).
+        target_cell.childNodes[:] = []
+
+        # Remove all attributes that could contain values and datatypes. All previous content of the cell will be removed including the datatype.
+        for attr in ("value", "string-value", "date-value", "boolean-value", "time-value", "currency", "value-type"):
+            key = (OFFICENS, attr)
+            if key in target_cell.attributes:
+                del target_cell.attributes[key]
+        
+        # Delete all value and value-type keys from other namespaces (this typically happens when converting from xlsx to ods).
+        for key in list(target_cell.attributes):
+            ns, name = key
+            if name == "value-type":
+                del target_cell.attributes[key]
+        
+        # Remove formulas in the cell.
+        key = (TABLENS, "formula")
+        if key in target_cell.attributes:
+            del target_cell.attributes[key]
 
         # ODS uses float for all numbers.
         if isinstance(value, (int, float)):
@@ -196,46 +218,102 @@ class ODSHandler():
     
     '''
     =====================================================================================
-    | Removes all lines without any content. Lots of empty rows can cause problems when |
-    | they reach the row limit (~1.000.000). When the row limit is reached no new rows  |
-    | can be added without corrupting the file.                                         |
+    | Removes all lines without any content.                                            |
+    |                                                                                   |
+    | Somehow our ODS file has lots of empty rows which can cause problems once they    |
+    | reach the row limit (~ 1.000.000).                                                |
+    |                                                                                   |
+    | If the row limit is reached no new rows can be added without corrupting the file. |
     =====================================================================================
     '''
     def remove_empty_rows(self):
-        rows = self.rows_ods
-        for row in reversed(rows):
-            num_repeat = int(row.getAttribute("numberrowsrepeated") or 1)
-
+        # Remove from bottom to top, so there are no problems to remove rows while iterating over them.
+        for row in reversed(self.rows_ods):
             if self.is_row_empty(row):
-                # if a empty row is repeated x times, set the repeat to 0
-                if num_repeat > 1:
-                    row.setAttribute("numberrowsrepeated", 0)
-                
-                else:
-                    self.sheet.removeChild(row)
+                self.sheet.removeChild(row)
+        
+        # Update the variable by reading the updated rows.
+        self.rows_ods = self.sheet.getElementsByType(TableRow)
+
     
+
     '''
     =====================================================================================
     | Removes empty cells in a document when they are repeated more than 10 times.      |
     | This prevents lots of empty cells in a row.                                       |
-    | If the column limit is reached (e.g. the document has ~16.000 empty lines)        |
-    | expanding the document will leave the document in a corrupt state.                |
+    |                                                                                   |
+    | Somehow our ODS file has so many empty cells that it reaches the column limit     |
+    | (~ 16.000).                                                                       |
+    |                                                                                   |
+    | If the column limit is reached no further columns can be added and the ODS file   |
+    | will be left in a corrupt state.                                                  |
     =====================================================================================
     '''
     def remove_empty_cells(self):
-        rows = self.rows_ods
-        for row in rows:
+        for row in self.rows_ods:
             cells_to_remove = []
             cells = row.getElementsByType(TableCell)
             for cell in cells:
                 repeated = int(cell.getAttribute("numbercolumnsrepeated") or 1)
 
+                # If more than 10 empty cells in a row.
                 if repeated > 10 and not cell.childNodes:
                     cells_to_remove.append(cell)
         
             for cell in cells_to_remove:
                 row.removeChild(cell)
+        
+        # Update the variable.
+        self.rows_ods = self.sheet.getElementsByType(TableRow)
 
+
+
+    '''
+    =====================================================================================
+    | Expand all cells that have "numbercolumnsrepeated" set to 2 or higher.            |
+    |                                                                                   |
+    | When x cells have the same value, ODS only creates one cell in the XML structure  |
+    | but sets "numbercolumnsrepeated" to x, so the Reader knows how often to display   |
+    | the same cell.                                                                    |
+    |                                                                                   |
+    | This leads to problems when using indices. For example: One cell does not have    |
+    | "numbercolumnsrepeated" but the second one has "numbercolumnsrepeated" set to     |
+    | two. This means there are two cells in the XML structure, but the ODS reader      |
+    | displays three cells. Because there are only two cells in the XML structure,      |
+    | calling cells[0] and cells[1] is valid, but cells[2] is not.                      |
+    |                                                                                   |
+    | This function fixes this by expanding repeated cells. This means for every cell   |
+    | in the ODS Reader there is one cell in the XML structure of the file.             |
+    =====================================================================================
+    '''
+    def expand_cells(self):
+        for row in self.rows_ods:
+            cells = row.getElementsByType(TableCell)
+            new_cells = []
+
+            for cell in cells:
+                repeat = int(cell.getAttribute("numbercolumnsrepeated") or 1)
+
+                # Avoid expanding large cells (bigger than 10) and cells that are only repeated once.
+                new_cells.append(cell)
+                if repeat == 1 or repeat > 10:
+                    continue
+                
+                # Set repeat to 1.
+                cell.setAttribute("numbercolumnsrepeated", 1)
+
+                # Expand and copy all repeated cells. Leave the expanded cells empty.
+                for _ in range(repeat-1):
+                    new_cell = TableCell()
+                    new_cells.append(new_cell)
+
+            # Remove all cells that were there before...
+            for old_cell in cells:
+                row.removeChild(old_cell)
+            
+            # ...and add the copies and expanded cells.
+            for new_cell in new_cells:
+                row.addElement(new_cell)
 
 
 
@@ -247,7 +325,6 @@ class ODSHandler():
     =====================================================================================
     '''
     def import_ods(self, changes: Sequence[MITREChange]):
-
         for c in changes:
             # If a technique is not in the .ods file, set everything to their default value.
             if c.mitre_id not in self.rows:
@@ -268,7 +345,6 @@ class ODSHandler():
 
                 # CIA
                 c.confidentiality, c.integrity, c.availability = False, False, False
-                continue
             
             # Else import the data from the row in the .ods file.
             else:
@@ -277,21 +353,21 @@ class ODSHandler():
                 # Client Scores.
                 c.client_criticality = 0 if row[COL_CLIENT_CRITICALITY] == "n.a." else row[COL_CLIENT_CRITICALITY]
                 c.client_criticality_sum = 0 if row[COL_CLIENT_CRITICALITY_SUM] == "n.a." else row[COL_CLIENT_CRITICALITY_SUM]
-                c.client_evaluation_status = row[COL_CLIENT_EVALUATION_STATUS]
+                c.client_evaluation_status = "n.a." if c.client_criticality == 0 else row[COL_CLIENT_EVALUATION_STATUS]
                 c.client_reasoning = row[COL_CLIENT_REASONING]
                 c.client_measures = row[COL_CLIENT_MEASURES]
 
                 # Infrastructure scores.
                 c.infra_criticality = 0 if row[COL_INFRASTRUCTURE_CRITICALITY] == "n.a." else row[COL_INFRASTRUCTURE_CRITICALITY]
                 c.infra_criticality_sum = 0 if row[COL_INFRASTRUCTURE_CRITICALITY_SUM] == "n.a." else row[COL_INFRASTRUCTURE_CRITICALITY_SUM]
-                c.infra_evaluation_status = row[COL_INFRASTRUCTURE_EVALUATION_STATUS]
+                c.infra_evaluation_status = "n.a." if c.infra_criticality == 0 else row[COL_INFRASTRUCTURE_EVALUATION_STATUS]
                 c.infra_reasoning = row[COL_INFRASTRUCTURE_REASONING]
                 c.infra_measures = row[COL_INFRASTRUCTURE_MEASURES]
 
                 # Service scores.
                 c.service_criticality = 0 if row[COL_SERVICE_CRITICALITY] == "n.a." else row[COL_SERVICE_CRITICALITY]
                 c.service_criticality_sum = 0 if row[COL_SERVICE_CRITICALITY_SUM] == "n.a." else row[COL_SERVICE_CRITICALITY_SUM]
-                c.service_evaluation_status = row[COL_SERVICE_EVALUATION_STATUS]
+                c.service_evaluation_status = "n.a." if c.service_criticality == 0 else row[COL_SERVICE_EVALUATION_STATUS]
                 c.service_reasoning = row[COL_SERVICE_REASONING]
                 c.service_measures = row[COL_SERVICE_MEASURES]
 
@@ -342,8 +418,8 @@ class ODSHandler():
     '''
     def export_ods(self, file_path: str, changes: Sequence[MITREChange]):
         for c in changes:
-            # New rows must be added for new techniques.
-            if c.change_category == "additions":
+            # If a row doesn't exist append it (e.g. new techniques).
+            if c.mitre_id not in self.rows:
                 self.append_row(self.create_row(c))
             
             # Only export techniques with 0 sub-techniques.
