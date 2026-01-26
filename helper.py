@@ -3,14 +3,16 @@ from sqlalchemy import select, asc
 from sqlalchemy.orm import Session
 from requests import get
 from glom import glom
-import json, re
+import json, re, zipfile
 from os import path
 from pathlib import Path
 from werkzeug.datastructures import FileStorage
-from magic import from_buffer
 from constants import *
 from ods import *
 from xlsx import *
+import zipfile
+from io import BytesIO
+
 
 
 '''
@@ -459,28 +461,42 @@ def service_sum(change: MITREChange) -> int:
 | extension and the mimetype by reading the contents of the file.                   |
 =====================================================================================
 '''
-# 
 def is_xlsx_or_ods(file: FileStorage) -> Boolean:
+    # Make sure the pointer is set to the start.
+    file.seek(0)
+
+    # Convert the file to BytesIO to ensure the stream can be read by zipfile library.
+    data = file.read()
+    file.seek(0)
+    bio = BytesIO(data)
+    
     # Get the file extension.
     file_ext = file.filename.lower().split(".")[-1]
+    
+    # If extension not ods or xlsx.
+    if file_ext not in ("ods", "xlsx"):
+        return False
 
-    # Find out mimetype by reading the contents of the file.
-    file_bytes = file.read()
-    file.seek(0)
-    mimetype = from_buffer(file_bytes, mime=True)
+    # Reading the file.
+    try:
+        with zipfile.ZipFile(bio, 'r') as f:
+            # List of filenames in the ZIP archive.
+            files = f.namelist()
+            
+            # ODS has a file called 'mimetype'
+            if "mimetype" in files:
+                mimetype = f.read("mimetype").decode("utf-8").strip()
+                if mimetype == "application/vnd.oasis.opendocument.spreadsheet":
+                    return True
+            
+            # XLSX has a file called 'xl/workbook.xml'.
+            if "xl/workbook.xml" in files:
+                return True
+            
+            return False
 
-    # Check the file. Only ods and xlsx is allowed.
-    allowed_extensions = ["ods", "xlsx"]
-    allowed_mimetypes = [
-        # ODS
-        "application/vnd.oasis.opendocument.spreadsheet",
-        # XLSX
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        # XLSX files are basically ZIP files and are sometimes detected as application/zip.
-        "application/zip"
-    ]
-
-    return file_ext in allowed_extensions and mimetype in allowed_mimetypes
+    except zipfile.BadZipFile:
+        return False
 
 
 
@@ -516,28 +532,39 @@ def handle_upload(file: FileStorage, from_version: str, to_version: str):
 
 
 
+'''
+=====================================================================================
+| Wrapper for the import function of the file. This function determines the file    |
+| type and calls the correct import function for each file type.                    |
+| The spreadsheet file will be imported into the local SQLite DB.                   |
+=====================================================================================
+'''
 def import_file(file_path: str, from_version: str, to_version: str, db: Session):
     file_ext = file_path.split(".")[-1]
-    sheet_name = "MITRE_ATT&CK"
-
     changes = get_changes(from_version, to_version, db)
 
     if file_ext == "xlsx":
-        handler = XLSXHandler(file_path=file_path, sheet_name=sheet_name, db=db)
+        handler = XLSXHandler(file_path=file_path, sheet_name=SHEET_NAME, db=db)
         handler.import_xlsx(changes)
 
     elif file_ext == "ods":
-        handler = ODSHandler(file_path=file_path, sheet_name=sheet_name, db=db)
+        handler = ODSHandler(file_path=file_path, sheet_name=SHEET_NAME, db=db)
         handler.import_ods(changes)
 
 
 
+'''
+=====================================================================================
+| Wrapper for the export function of the file. This function determines the file    |
+| type and calls the correct export function for each file type.                    |
+| The function then writes the exported spreadsheet file to disk.                   |
+=====================================================================================
+'''
 def export_file(from_version: str, to_version: str, db: Session) -> str:
     # Get the current spreadsheet file for this upgrade.
     file_name = get_spreadsheet_filename(from_version, to_version)
     file_ext = file_name.split(".")[-1]
     file_path = path.join("sheets", file_name)
-    sheet_name = "MITRE_ATT&CK"
 
     export_name = f"EXPORT_{file_name}"
     export_path = path.join("sheets", export_name)
@@ -546,8 +573,8 @@ def export_file(from_version: str, to_version: str, db: Session) -> str:
     changes = get_changes(from_version, to_version, db)
 
     if file_ext == "xlsx":
-        handler = XLSXHandler(file_path=file_path, sheet_name=sheet_name, db=db)
+        handler = XLSXHandler(file_path=file_path, sheet_name=SHEET_NAME, db=db)
         handler.export_xlsx(file_path=export_path, changes=changes)
     elif file_ext == "ods":
-        handler = ODSHandler(file_path=file_path, sheet_name=sheet_name, db=db)
+        handler = ODSHandler(file_path=file_path, sheet_name=SHEET_NAME, db=db)
         handler.export_ods(file_path=export_path, changes=changes)
