@@ -3,9 +3,14 @@ from sqlalchemy.orm import Session, declarative_base
 
 Base = declarative_base()
 
+# Establish connection to DB.
+engine = create_engine("sqlite:///db/mitre_changes.db", echo=False)
+
+
+
 '''
 =====================================================================================
-| DATABASE SCHEME                                                                   |
+| Table for all changes in an upgrade.                                              |
 =====================================================================================
 '''
 # The following table stores each upgrade. For each change in an upgrade there is a comparison between the new and old description.
@@ -34,21 +39,25 @@ class MITREChange(Base):
     client_criticality_sum = Column(Integer, default=0)
     client_reasoning = Column(Text)
     client_measures = Column(Text)
-    client_evaluation_status = Column(Text, default="not evaluated")
+    client_evaluation_status = Column(Text, default="n.a.")
     infra_criticality = Column(Integer, default=0)
     infra_criticality_sum = Column(Integer, default=0)
     infra_reasoning = Column(Text)
     infra_measures = Column(Text)
-    infra_evaluation_status = Column(Text, default="not evaluated")
+    infra_evaluation_status = Column(Text, default="n.a.")
     service_criticality = Column(Integer, default=0)
     service_criticality_sum = Column(Integer, default=0)
     service_reasoning = Column(Text)
     service_measures = Column(Text)
-    service_evaluation_status = Column(Text, default="not evaluated")
+    service_evaluation_status = Column(Text, default="n.a.")
 
 
 
-# Table for all current MITRE versions to compare.
+'''
+=====================================================================================
+| Table for all MITRE versions.                                                     |
+=====================================================================================
+'''
 class MITREVersion(Base):
     __tablename__ = "mitre_versions"
     major = Column(Integer, primary_key=True)
@@ -56,12 +65,21 @@ class MITREVersion(Base):
     name = Column(Text)
 
 
-def get_engine():
-    return create_engine("sqlite:///db/mitre_changes.db", echo=False)
 
-# Returns a Session object that can be used to query the database.
+'''
+=====================================================================================
+| Returns a Session object that can be used to query the database.                  |
+=====================================================================================
+'''
 def get_db_connection():
-    return Session(get_engine())
+    return Session(engine)
 
+
+
+'''
+=====================================================================================
+| Creates all tables, if they don't already exist.                                  |
+=====================================================================================
+'''
 def create_tables():
-    Base.metadata.create_all(get_engine())
+    Base.metadata.create_all(engine)
