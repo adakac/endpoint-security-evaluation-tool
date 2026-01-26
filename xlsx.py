@@ -14,6 +14,8 @@ from openpyxl import load_workbook, Workbook
 class XLSXException(Exception):
     pass
 
+
+
 '''
 =====================================================================================
 | Helper class for managing reading and writing to XLSX files.                      |
@@ -26,8 +28,11 @@ class XLSXHandler():
         self.doc_values: Workbook = load_workbook(file_path, data_only=True) # One workbook for the values...
         self.doc_formulas: Workbook = load_workbook(file_path, data_only=False) # ... and one workbook for the formulas.
         self.sheet_name: str = sheet_name
-        self.rows: list = self.read_rows()
+        self.rows: dict = self.read_rows() # Only for reading the values, not for manipulating.
         self.db: Session = db
+        
+        # Remove all empty rows so new rows come directly after non-empty rows. This way there are no big empty gaps.
+        self.remove_empty_rows()
 
 
 
@@ -37,7 +42,7 @@ class XLSXHandler():
     =====================================================================================
     '''
     def read_rows(self) -> list:
-        rows = [] # TODO: CONVERT TO HASHTABLE
+        rows = {}
 
         # Get the worksheet with values (not the formulas) for reading.
         try:
@@ -50,7 +55,9 @@ class XLSXHandler():
             for cell in row:
                 row_data.append(cell.value)
             
-            rows.append(row_data)
+            # Use the MITREID as key in the hashtable.
+            key = row[COL_MITREID].value
+            rows[key] = row_data
         
         return rows
     
@@ -64,11 +71,11 @@ class XLSXHandler():
     =====================================================================================
     '''
     def import_xlsx(self, changes: Sequence[MITREChange]) -> None:
-        mitre_ids = [row[COL_MITREID] for row in self.rows]
+        rows = self.rows
 
         for c in changes:
             # If a technique is not in the xlsx file, set everything to their default value.
-            if c.mitre_id not in mitre_ids:
+            if c.mitre_id not in rows:
                 # Client scores.
                 c.client_criticality, c.client_criticality_sum = 0, 0
                 c.client_evaluation_status = "not evaluated"
@@ -85,38 +92,39 @@ class XLSXHandler():
                 c.infra_reasoning, c.infra_measures = "", ""
 
                 c.confidentiality, c.integrity, c.availability = False, False, False
-                continue
 
             # Else, search for the row and import the values into the DB.
-            for row in self.rows:
-                if row[COL_MITREID] == c.mitre_id:
-                    # Client scores.
-                    c.client_criticality = 0 if row[COL_CLIENT_CRITICALITY] == "n.a." else row[COL_CLIENT_CRITICALITY]
-                    c.client_criticality_sum = 0 if row[COL_CLIENT_CRITICALITY_SUM] == "n.a." else row[COL_CLIENT_CRITICALITY_SUM]
-                    c.client_evaluation_status = row[COL_CLIENT_EVALUATION_STATUS]
-                    c.client_reasoning = row[COL_CLIENT_REASONING]
-                    c.client_measures = row[COL_CLIENT_MEASURES]
+            else:
+                row = rows[c.mitre_id]
+                
+                # Client scores.
+                c.client_criticality = 0 if row[COL_CLIENT_CRITICALITY] == "n.a." else row[COL_CLIENT_CRITICALITY]
+                c.client_criticality_sum = 0 if row[COL_CLIENT_CRITICALITY_SUM] == "n.a." else row[COL_CLIENT_CRITICALITY_SUM]
+                c.client_evaluation_status = row[COL_CLIENT_EVALUATION_STATUS]
+                c.client_reasoning = row[COL_CLIENT_REASONING]
+                c.client_measures = row[COL_CLIENT_MEASURES]
 
-                    # Infrastructure scores.
-                    c.infra_criticality = 0 if row[COL_INFRASTRUCTURE_CRITICALITY] == "n.a." else row[COL_INFRASTRUCTURE_CRITICALITY]
-                    c.infra_criticality_sum = 0 if row[COL_INFRASTRUCTURE_CRITICALITY_SUM] == "n.a." else row[COL_INFRASTRUCTURE_CRITICALITY_SUM]
-                    c.infra_evaluation_status = row[COL_INFRASTRUCTURE_EVALUATION_STATUS]
-                    c.infra_reasoning = row[COL_INFRASTRUCTURE_REASONING]
-                    c.infra_measures = row[COL_INFRASTRUCTURE_MEASURES]
+                # Infrastructure scores.
+                c.infra_criticality = 0 if row[COL_INFRASTRUCTURE_CRITICALITY] == "n.a." else row[COL_INFRASTRUCTURE_CRITICALITY]
+                c.infra_criticality_sum = 0 if row[COL_INFRASTRUCTURE_CRITICALITY_SUM] == "n.a." else row[COL_INFRASTRUCTURE_CRITICALITY_SUM]
+                c.infra_evaluation_status = row[COL_INFRASTRUCTURE_EVALUATION_STATUS]
+                c.infra_reasoning = row[COL_INFRASTRUCTURE_REASONING]
+                c.infra_measures = row[COL_INFRASTRUCTURE_MEASURES]
 
-                    # Service scores.
-                    c.service_criticality = 0 if row[COL_SERVICE_CRITICALITY] == "n.a." else row[COL_SERVICE_CRITICALITY]
-                    c.service_criticality_sum = 0 if row[COL_SERVICE_CRITICALITY_SUM] == "n.a." else row[COL_SERVICE_CRITICALITY_SUM]
-                    c.service_evaluation_status = row[COL_SERVICE_EVALUATION_STATUS]
-                    c.service_reasoning = row[COL_SERVICE_REASONING]
-                    c.service_measures = row[COL_SERVICE_MEASURES]
+                # Service scores.
+                c.service_criticality = 0 if row[COL_SERVICE_CRITICALITY] == "n.a." else row[COL_SERVICE_CRITICALITY]
+                c.service_criticality_sum = 0 if row[COL_SERVICE_CRITICALITY_SUM] == "n.a." else row[COL_SERVICE_CRITICALITY_SUM]
+                c.service_evaluation_status = row[COL_SERVICE_EVALUATION_STATUS]
+                c.service_reasoning = row[COL_SERVICE_REASONING]
+                c.service_measures = row[COL_SERVICE_MEASURES]
 
-                    # If "x" then True, else False.
-                    c.confidentiality = row[COL_CONFIDENTIALITY] == "x"
-                    c.integrity = row[COL_INTEGRITY] == "x"
-                    c.availability = row[COL_AVAILABILITY] == "x"
+                # If "x" then True, else False.
+                c.confidentiality = row[COL_CONFIDENTIALITY] == "x"
+                c.integrity = row[COL_INTEGRITY] == "x"
+                c.availability = row[COL_AVAILABILITY] == "x"
             
         self.db.commit()
+
 
 
     '''
@@ -145,8 +153,28 @@ class XLSXHandler():
         for cell in row:
             if cell.value not in (None, ""):
                 return False
-            
+                    
         return True
+    
+
+
+    '''
+    =====================================================================================
+    | Delete all rows that are completely empty so there are no big gaps in the         |
+    | document.                                                                         |
+    =====================================================================================
+    '''
+    def remove_empty_rows(self):
+        sheet = self.doc_formulas[self.sheet_name]
+
+        # Delete all empty rows from bottom to top, else there will
+        # be a problem when removing rows while iterating over them.
+        for row in reversed(list(sheet.iter_rows(min_row=2))):
+            if self.is_empty_row(row):
+                # Every cell contains the index of the row they are in.
+                row_index = row[0].row
+                sheet.delete_rows(row_index)
+
 
 
     '''
@@ -162,17 +190,20 @@ class XLSXHandler():
 
         for c in changes:
             # Append to the sheet if it's a new addition.
-            if c.change_category == "additions":
+            if c.mitre_id not in self.rows:
                 sheet.append(self.create_row(c))
                 continue
             
-            # If not a new addition, change the row.
-            # Iterate over all rows to find the correct one.
+            # Else, export the values of the tool into the xlsx file.
+            # Iterate over all rows of the xlsx to find the correct one.
             for row in sheet.iter_rows(min_row=2):
-                # Get the MITREID. If it's empty use an empty string by default (or else it will be None and a TypeError happens with regex).
-                mitre_id = row[COL_MITREID].value or ""
+                # Get the MITREID cell. This cell does not contain the MITREID directly, but a formula that contains the MITREID.
+                # Example: =HYPERLINK("https://attack.mitre.org/techniques/T1027/003";"T1027.003")
+                mitre_id = row[COL_MITREID].value
+                if not mitre_id:
+                    continue
 
-                # Extract with regex pattern.
+                # Extract the MITREID from the formula.
                 pattern = r'HYPERLINK\([^,;]+[,;]\s*"([^"]+)"\)'
                 match = re.search(pattern, mitre_id)
                 mitre_id = match.group(1) if match else None
@@ -202,11 +233,5 @@ class XLSXHandler():
                     row[COL_CONFIDENTIALITY].value = "x" if c.confidentiality else None
                     row[COL_INTEGRITY].value = "x" if c.integrity else None
                     row[COL_AVAILABILITY].value = "x" if c.availability else None
-        
-        # Delete all empty rows from bottom to top, else there will
-        # be a problem when removing rows while iterating over them.
-        for row in reversed(list(sheet.iter_rows(min_row=2))):
-            if self.is_empty_row(row):
-                sheet.delete_rows(row[0].row)
 
         self.doc_formulas.save(file_path)
