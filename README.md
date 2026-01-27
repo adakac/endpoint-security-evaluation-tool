@@ -62,6 +62,9 @@ This automatically starts the web UI on port 8000. Then simply go to [http://loc
 
 A SQLite database is automatically created in ```./db```.
 
+## Thanks
+- Thanks to [mani5789](https://github.com/mani5789) for creating the [ESE Helper Tool](https://github.com/adakac/endpoint-security-evaluation-tool) with us.
+
 ## Disclaimer
 This project has NO affiliation with, sponsorship, or endorsement by MITRE. This project does NOT represent the views and opinions of MITRE or MITRE personnel.
 
