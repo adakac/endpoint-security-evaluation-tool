@@ -26,9 +26,6 @@ app = Flask(
     static_folder=hp.get_resource_path("static")
 )
 
-print(hp.get_resource_path("templates"))
-print(hp.get_resource_path("static"))
-
 # Create 'db' folder if it doesn't exist and 'sheets' for uploaded XLSX/ODS files.
 Path("db").mkdir(exist_ok=True)
 Path("sheets").mkdir(exist_ok=True)
