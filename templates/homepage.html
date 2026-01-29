@@ -6,20 +6,6 @@
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
 </div>
 
-{% if new_versions %}
-<div class="alert alert-primary alert-dismissible fade show" role="alert">
-    <p>
-        Since your last visit new MITRE version(s) released:
-        <ul>
-        {% for v in new_versions %}
-            <li>{{ v }}</li>
-        {% endfor %}
-        </ul>
-    </p>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-</div>
-{% endif %}
-
 <h2>Start a new Upgrade</h2>
 <form id="upgrade_form" method="POST" action="{{ url_for('initiate_upgrade') }}">
     <label for="version_select">Choose your current version:</label>
