@@ -238,9 +238,7 @@
                 {# Client Reasoning #}
                 <div>
                     <label for="client-reasoning"><b>Client Reasoning</b></label>
-                    <textarea id="client-reasoning" name="client-reasoning" rows="4" class="form-control" {% if client_disabled %} disabled {% endif %}>
-                        {{ change.client_reasoning or "" }}
-                    </textarea>
+                    <textarea id="client-reasoning" name="client-reasoning" rows="4" class="form-control" {% if client_disabled %} disabled {% endif %}>{{ change.client_reasoning or "" }}</textarea>
                     <br>
                     <button id="client-reasoning-btn" type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
                     <span class="message"></span>
@@ -250,9 +248,7 @@
                 {# Client Measures #}
                 <div>
                     <label for="client-measures"><b>Client Measures</b></label>
-                    <textarea id="client-measures" name="client-measures" rows="4" class="form-control" {% if client_disabled %} disabled {% endif %}>
-                        {{ change.client_measures or "" }}
-                    </textarea>
+                    <textarea id="client-measures" name="client-measures" rows="4" class="form-control" {% if client_disabled %} disabled {% endif %}>{{ change.client_measures or "" }}</textarea>
                     <br>
                     <button id="client-measures-btn" type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
                     <span class="message"></span>
@@ -279,9 +275,7 @@
                 {# Infrastructure Reasoning #}
                 <div>
                     <label for="infra-reasoning"><b>Infrastructure Reasoning</b></label>
-                    <textarea id="infra-reasoning" name="infra-reasoning" rows="4" class="form-control" {% if infra_disabled %} disabled {% endif %}>
-                        {{ change.infra_reasoning or "" }}
-                    </textarea>
+                    <textarea id="infra-reasoning" name="infra-reasoning" rows="4" class="form-control" {% if infra_disabled %} disabled {% endif %}>{{ change.infra_reasoning or "" }}</textarea>
                     <br>
                     <button id="infra-reasoning-btn" type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
                     <span class="message"></span>
@@ -292,9 +286,7 @@
                 {# Infrastructure Measures #}
                 <div>
                     <label for="infra-measures"><b>Infrastructure Measures</b></label>
-                    <textarea id="infra-measures" name="infra-measures" rows="4" class="form-control" {% if infra_disabled %} disabled {% endif %}>
-                        {{ change.infra_measures or "" }}
-                    </textarea>
+                    <textarea id="infra-measures" name="infra-measures" rows="4" class="form-control" {% if infra_disabled %} disabled {% endif %}>{{ change.infra_measures or "" }}</textarea>
                     <br>
                     <button id="infra-measures-btn" type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
                     <span class="message"></span>
@@ -319,9 +311,7 @@
                 {# Service Reasoning #}
                 <div>
                     <label for="service-reasoning"><b>Service Reasoning</b></label>
-                    <textarea id="service-reasoning" name="service-reasoning" rows="4" class="form-control" {% if service_disabled %} disabled {% endif %}>
-                        {{ change.service_reasoning or "" }}
-                    </textarea>
+                    <textarea id="service-reasoning" name="service-reasoning" rows="4" class="form-control" {% if service_disabled %} disabled {% endif %}>{{ change.service_reasoning or "" }}</textarea>
                     <br>
                     <button id="service-reasoning-btn" type="button" class="btn btn-secondary btn-sm reasoning-button">Save</button>
                     <span class="message"></span>
@@ -331,9 +321,7 @@
                 {# Service Measures #}
                 <div>
                     <label for="service-measures"><b>Service Measures</b></label>
-                    <textarea id="service-measures" name="service-measures" rows="4" class="form-control" {% if service_disabled %} disabled {% endif %}>
-                        {{ change.service_measures or "" }}
-                    </textarea>
+                    <textarea id="service-measures" name="service-measures" rows="4" class="form-control" {% if service_disabled %} disabled {% endif %}>{{ change.service_measures or "" }}</textarea>
                     <br>
                     <button id="service-measures-btn" type="button" class="btn btn-secondary btn-sm measures-button">Save</button>
                     <span class="message"></span>
@@ -427,39 +415,39 @@
 
     {# The following section covers any changes that are not the description. #}
     {% if other_changes %}
-    <h1 data-bs-toggle="collapse" data-bs-target="#collapse" style="cursor: pointer;" aria-expanded="false">
-        Other Changes
-        <i class="bi bi-chevron-down toggle-icon fs-3"></i>
-    </h1>
+        <h1 data-bs-toggle="collapse" data-bs-target="#collapse" style="cursor: pointer;" aria-expanded="false">
+            Other Changes
+            <i class="bi bi-chevron-down toggle-icon fs-3"></i>
+        </h1>
     
-    {% if other_changes.get('values_changed') %}
-    <br>
-    <div id="collapse" class="collapse">
-        <h4><b>Changes</b></h4>
-        <table class="table table-striped table-bordored table-hover table-bordered">
-            <thead>
+        {% if other_changes.get('values_changed') %}
+        <br>
+        <div id="collapse" class="collapse">
+            <h4><b>Changes</b></h4>
+            <table class="table table-striped table-bordered table-hover table-bordered">
+                <thead>
+                    <tr>
+                        <th style="width: 33%;">Change</th>
+                        <th style="width: 33%;">Old Value</th>
+                        <th style="width: 33%;">New Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for key, value in other_changes.values_changed.items() %}
                 <tr>
-                    <th style="width: 33%;">Change</th>
-                    <th style="width: 33%;">Old Value</th>
-                    <th style="width: 33%;">New Value</th>
+                    <td>{{ key }}</td>
+                    <td>{{ value.old_value }}</td>
+                    <td>{{ value.new_value }}</td>
                 </tr>
-            </thead>
-            <tbody>
-            {% for key, value in other_changes.values_changed.items() %}
-            <tr>
-                <td>{{ key }}</td>
-                <td>{{ value.old_value }}</td>
-                <td>{{ value.new_value }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+                {% endfor %}
+                </tbody>
+            </table>
         {% endif %}
     
         {% if other_changes.get('iterable_item_added') or other_changes.get('dictionary_item_added') %}
         <br>
         <h4><b>Additions</b></h4>
-        <table class="table table-striped table-bordored table-hover table-bordered">
+        <table class="table table-striped table-bordered table-hover table-bordered">
             <thead>
                 <tr>
                     <th style="width: 33%;">Addition</th>
@@ -488,11 +476,10 @@
         </table>
         {% endif %}
     
-    
-        {% if other_changes.get('iterable_item.removed') or other_changes.get('dictionary_item_removed') %}
+        {% if other_changes.get('iterable_item_removed') or other_changes.get('dictionary_item_removed') %}
         <br>
         <h4><b>Removals</b></h4>
-        <table class="table table-striped table-bordored table-hover table-bordered">
+        <table class="table table-striped table-bordered table-hover table-bordered">
             <thead>
                 <tr>
                     <th style="width: 33%;">Removal</th>
@@ -521,10 +508,10 @@
         </table>
         {% endif %}
 
-        {% if other_changes.get("changelog_mitigations").get("new") or other_changes.get("changelog_mitigations").get("dropped") %}
+        {% if other_changes.get("changelog_mitigations", {}).get("new") or other_changes.get("changelog_mitigations", {}).get("dropped") %}
         <br>
         <h4><b>Mitigations</b></h4>
-            <table class="table table-striped table-bordored table-hover table-bordered">
+            <table class="table table-striped table-bordered table-hover table-bordered">
             {% if other_changes.get("changelog_mitigations").get("new") %}
                 {% for c in other_changes.changelog_mitigations.new %}
                     <tr>
@@ -545,10 +532,10 @@
             </table>
         {% endif %}
 
-        {% if other_changes.get("changelog_detections").get("new") or other_changes.get("changelog_detections").get("dropped") %}
+        {% if other_changes.get("changelog_detections", {}).get("new") or other_changes.get("changelog_detections", {}).get("dropped") %}
         <br>
         <h4><b>Detections</b></h4>
-            <table class="table table-striped table-bordored table-hover table-bordered">
+            <table class="table table-striped table-bordered table-hover table-bordered">
             {% if other_changes.get("changelog_detections").get("new") %}
                 {% for c in other_changes.changelog_detections.new %}
                     <tr>
@@ -556,34 +543,29 @@
                         <td style="width: 90%;">{{ c }}</td>
                     </tr>
                 {% endfor %}
-                </ul>
             {% endif %}
 
             {% if other_changes.get("changelog_detections").get("dropped") %}
-            <ul>
                 {% for c in other_changes.changelog_detections.dropped %}
                     <tr>
                         <td style="width: 10%;">Removed</td>
                         <td style="width: 90%;">{{ c }}</td>
                     </tr>
                 {% endfor %}
-            </ul>
             {% endif %}
             </table>
         {% endif %}
 
-        {% if other_changes.get("changelog_detection_strategies").get("new") or other_changes.get("changelog_detection_strategies").get("dropped") %}
+        {% if other_changes.get("changelog_detection_strategies", {}).get("new") or other_changes.get("changelog_detection_strategies", {}).get("dropped") %}
         <br>
         <h4><b>Detection Strategies</b></h4>
-            <table class="table table-striped table-bordored table-hover table-bordered">
+            <table class="table table-striped table-bordered table-hover table-bordered">
             {% if other_changes.get("changelog_detection_strategies").get("new") %}
                 {% for c in other_changes.changelog_detection_strategies.new %}
                     <tr>
                         <td style="width: 10%;">Added</td>
                         <td style="width: 90%;">{{ c }}</td>
-                        
                     </tr>
-
                 {% endfor %}
             {% endif %}
 
@@ -598,7 +580,7 @@
             </table>
         {% endif %}
         <br><br>
-        {% endif %}
+    {% endif %}
     </div>
 </div>
 {% endblock %}
