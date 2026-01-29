@@ -70,16 +70,23 @@ A SQLite database is automatically created in ```./db```.
 
 ### Creating an executable file with PyInstaller
 
+** Windows: **
 ```
 pip install pyinstaller
 python -m PyInstaller --onefile --add-data "templates;templates" --add-data "static;static" ese.py
+```
+
+** Linux: **
+```
+pip install pyinstaller
+python -m PyInstaller --onefile --add-data "templates:templates" --add-data "static:static" ese.py
 ```
 
 The executable file will be created in ```./dist```. You can delete the ```*.spec``` file afterwards.
 
 ### Running directly from the provided executable files
 
-See Releases...
+See Releases.
 
 ## Thanks
 - Thanks to [mani5789](https://github.com/mani5789) for creating the [ESE Helper Tool](https://github.com/adakac/endpoint-security-evaluation-tool) with us.
