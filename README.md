@@ -52,6 +52,12 @@ Frontend:
 
 ## Installation
 
+### Python Version
+
+This project has been developed with Python version 3.13.9.
+
+### Running with Python from Source code
+
 ```
 git clone https://github.com/adakac/endpoint-security-evaluation-tool.git
 pip install markdown sqlalchemy flask glom requests openpyxl odfpy
@@ -61,6 +67,17 @@ python ese.py
 This automatically starts the web UI on port 8000. Then simply go to [http://localhost:8000](http://localhost:8000).
 
 A SQLite database is automatically created in ```./db```.
+
+### Creating an executable file with PyInstaller
+
+```
+pip install pyinstaller
+python -m PyInstaller --onefile --add-data "templates;templates" --add-data "static;static" ese.py
+```
+
+The executable file will be created in ```./dist```. You can delete the ```*.spec``` file afterwards.
+
+### Running directly from the provided executable files
 
 ## Disclaimer
 This project has NO affiliation with, sponsorship, or endorsement by MITRE. This project does NOT represent the views and opinions of MITRE or MITRE personnel.
