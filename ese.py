@@ -20,7 +20,14 @@ from xlsx import XLSXException
 | FLASK APP AND DATABASE SETUP                                                      |
 =====================================================================================
 '''
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=hp.get_resource_path("templates"),
+    static_folder=hp.get_resource_path("static")
+)
+
+print(hp.get_resource_path("templates"))
+print(hp.get_resource_path("static"))
 
 # Create 'db' folder if it doesn't exist and 'sheets' for uploaded XLSX/ODS files.
 Path("db").mkdir(exist_ok=True)
@@ -81,8 +88,7 @@ def homepage():
         "homepage.html",
         title="Home",
         versions=versions,
-        upgrades=upgrades,
-        new_versions=app.config["new_versions"]
+        upgrades=upgrades
     )
 
 
@@ -162,8 +168,8 @@ def upgrade(from_version, to_version):
 def change(from_version, to_version, mitre_id):
     change = hp.get_change(db, from_version, to_version, mitre_id)
 
-    other_changes = hp.load_json(change.other_changes)
-    platforms = hp.load_json(change.platforms)
+    other_changes = hp.load_json(change.other_changes, default={})
+    platforms = hp.load_json(change.platforms, default={})
 
     # Links to the MITRE page for the old and new versions of the technique.
     mitre_link_old = f"https://attack.mitre.org/versions/{from_version.split(".")[0]}/techniques/{mitre_id.replace(".", "/")}" \
@@ -171,6 +177,8 @@ def change(from_version, to_version, mitre_id):
         else None
     
     mitre_link_new = f"https://attack.mitre.org/versions/{to_version.split(".")[0]}/techniques/{mitre_id.replace(".", "/")}"
+
+    print(other_changes)
 
     return render_template(
         "change.html",
@@ -450,4 +458,4 @@ def change_reasoning_and_measures():
 =====================================================================================
 '''
 if __name__ == "__main__":
-    app.run(port=8000)
+    app.run(host="localhost", port=8000)

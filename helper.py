@@ -3,15 +3,33 @@ from sqlalchemy import select, asc
 from sqlalchemy.orm import Session
 from requests import get
 from glom import glom
-import json, re, zipfile
+import json, re, zipfile, sys
 from os import path
 from pathlib import Path
 from werkzeug.datastructures import FileStorage
 from constants import *
 from ods import *
 from xlsx import *
-import zipfile
 from io import BytesIO
+
+
+
+'''
+=====================================================================================
+| Gets the absolute path of the data directories (e.g. "templates" and "static").   |
+| When the python project is packed with pyinstaller into an .exe file, the .exe    |
+| file creates a temp folder on execution where it unpacks the data folders.        |
+| This folder is saved under 'sys._MEIPASS'.                                        |
+| The folder is created when the exe starts and deleted when the exe exits.         |
+=====================================================================================
+'''
+def get_resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except:
+        base_path = path.abspath(".")
+    
+    return path.join(base_path, relative_path)
 
 
 
