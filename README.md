@@ -2,7 +2,7 @@
 <a href="https://github.com/adakac/endpoint-security-evaluation-tool/releases/latest"><img src="https://img.shields.io/github/v/release/adakac/endpoint-security-evaluation-tool?label=Release&color=brightgreen&cacheSeconds=3600" alt="Release"/></a>
 <a href="./LICENSE.txt">[![CC BY 4.0][cc-by-shield]][cc-by]</a>
 
-A web-based tool to increase efficiency of ESE updates.
+A web-based tool to increase efficiency of [ESE](https://github.com/adakac/endpoint-security-evaluation-spreadsheet) updates.
 
 ## Introduction
 The backend is made with Python Flask to retrieve all changes that were made in the new MITRE version. The changes are then parsed and the needed information is extracted and written to a SQLite database to keep track of the upgrade progress and to be able to pause and continue later.
